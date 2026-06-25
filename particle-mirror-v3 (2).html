@@ -363,8 +363,8 @@
       transition: opacity 0.3s ease;
       transform-origin: center center;
       will-change: transform, opacity;
-      filter: drop-shadow(0 0 12px rgba(255,255,255,0.3)) drop-shadow(0 0 4px rgba(255,255,255,0.6));
-      
+      filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.3)) drop-shadow(0 0 4px rgba(255, 255, 255, 0.6));
+
       /* P4TT3RNS Custom Typography */
       width: 937px;
       height: 156px;
@@ -444,7 +444,8 @@
       <button class="ctrl-btn" id="btn-ghost" data-mode="ghost">Ghost</button>
       <button class="ctrl-btn" id="btn-chrome" data-mode="chrome">Chrome</button>
       <button class="ctrl-btn" id="btn-burst" data-mode="burst">Burst</button>
-      <button class="ctrl-btn active" id="btn-mute" style="margin-left:12px;border-color:rgba(255,255,255,0.22)">♪ On</button>
+      <button class="ctrl-btn active" id="btn-mute" style="margin-left:12px;border-color:rgba(255,255,255,0.22)">♪
+        On</button>
     </div>
     <div class="stats" id="hand-stats">
       hand x — <br>
@@ -496,7 +497,7 @@
       // ---- Particle system ----
       // Dynamic MAX_P: scales with screen area. ~50k base, up to 120k for large/4K screens
       const screenArea = window.innerWidth * window.innerHeight;
-      let MAX_P = Math.min(120000, Math.max(50000, Math.round(screenArea * 0.04)));
+      let MAX_P = Math.min(120000, Math.max(100000, Math.round(screenArea * 0.1)));
       const particles = [];
 
       // Recalculate on resize
