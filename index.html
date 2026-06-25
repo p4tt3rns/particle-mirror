@@ -1030,7 +1030,8 @@
         for (let i = 0; i < 6; i++) {
           const synth = new Tone.FMSynth({
             envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 },
-            modulationIndex: 2
+            modulationIndex: 2,
+            volume: -15
           }).connect(grainPanner);
           grainSynths.push(synth);
         }

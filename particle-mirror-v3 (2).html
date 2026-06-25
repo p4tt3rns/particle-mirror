@@ -382,6 +382,7 @@
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 </head>
 
 <body>
@@ -405,7 +406,6 @@
             <path
               d="M54.6 36.6001C57.9 36.6001 60.7 35.9501 63 34.6501C65.4 33.3501 66.6 30.8001 66.6 27.0001C66.6 23.2001 65.4 20.6501 63 19.3501C60.7 18.0501 57.9 17.4001 54.6 17.4001H22.65V36.6001H54.6Z" />
             <path d="M143.849 18.9001L109.949 56.1001H143.849V18.9001Z" />
-            <path d="M234.648 77.1C234.648 78.9 235.748 79.8 237.948 79.8V82.5H214.848V79.8" />
           </g>
         </svg>
       </div>
@@ -497,13 +497,13 @@
       // ---- Particle system ----
       // Dynamic MAX_P: scales with screen area. ~50k base, up to 120k for large/4K screens
       const screenArea = window.innerWidth * window.innerHeight;
-      let MAX_P = Math.min(120000, Math.max(100000, Math.round(screenArea * 0.1)));
+      let MAX_P = Math.min(120000, Math.max(100000, Math.round(screenArea * 0.04)));
       const particles = [];
 
       // Recalculate on resize
       window.addEventListener('resize', () => {
         const area = window.innerWidth * window.innerHeight;
-        MAX_P = Math.min(120000, Math.max(50000, Math.round(area * 0.04)));
+        MAX_P = Math.min(120000, Math.max(100000, Math.round(area * 0.04)));
       });
 
       function Particle(x, y, brightness) {
@@ -512,7 +512,7 @@
         this.y = y + (Math.random() - 0.5) * 8;
         this.vx = 0; this.vy = 0;
         this.brightness = brightness;
-        this.size = 0.22 + brightness * 0.9 + Math.random() * 0.35;
+        this.size = 0.32 + brightness * 0.9 + Math.random() * 0.35;
         this.alpha = 0.3 + brightness * 0.7;
         this.chromatic = Math.random() < 0.03; // 3% chrome particles
         this.noiseOff = Math.random() * 1000;
@@ -603,6 +603,8 @@
         if (!state.running) return;
         requestAnimationFrame(draw);
 
+        if (typeof grainsThisFrame !== 'undefined') grainsThisFrame = 0;
+
         frameCount++;
         const t = ts * 0.001;
 
@@ -659,6 +661,7 @@
               fx = (dx / dist) * force * 4;
               fy = (dy / dist) * force * 4;
               p.touch = 1;
+              if (typeof triggerGrain === 'function') triggerGrain(p);
             }
           }
 
@@ -844,6 +847,7 @@
           mode = btn.dataset.mode;
           document.getElementById('stat-mode').textContent = mode;
           document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
+          if (typeof switchModeSoundscape === 'function') switchModeSoundscape(mode);
         });
       });
 
@@ -856,6 +860,7 @@
       permBtn.addEventListener('click', startCamera);
 
       async function startCamera() {
+        if (typeof Tone !== 'undefined') await Tone.start();
         permBtn.textContent = 'Initialising…';
         permBtn.disabled = true;
         try {
@@ -984,128 +989,148 @@
         document.getElementById('stat-particles').textContent = particles.length.toLocaleString();
       }
 
-      // ---- Audio Engine ----
-      let audioCtx = null;
-      let oscLow, oscMid, oscHigh, lfo;
-      let gainLow, gainMid, gainHigh, gainMaster, lfoGain;
-      let filterLow, filterMid;
+      // ---- Audio Engine (Tone.js) ----
       let audioStarted = false;
+      let grainsThisFrame = 0;
+      
+      // Nodes
+      let masterVol, masterFilter, masterComp, masterReverb, pannerX;
+      let grainDelay, grainPanner;
+      let droneOsc, droneFilter, droneLfo, droneVol;
+      let currentModeNodes = [];
+      let grainSynths = [];
+      let grainIndex = 0;
+      const MAX_GRAINS_PER_FRAME = 2;
+      
+      const pentatonicScale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00, 1046.50];
 
-      function initAudio() {
+      async function initAudio() {
         if (audioStarted) return;
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        await Tone.start();
+        
+        masterVol = new Tone.Volume(-Infinity).toDestination();
+        masterFilter = new Tone.Filter(15000, "lowpass").connect(masterVol);
+        masterComp = new Tone.Compressor({ threshold: -24, ratio: 6, knee: 12 }).connect(masterFilter);
+        masterReverb = new Tone.Reverb({ decay: 4 }).connect(masterComp);
+        masterReverb.wet.value = 0.4;
+        await masterReverb.ready;
+        
+        pannerX = new Tone.Panner(0).connect(masterReverb);
+        
+        grainDelay = new Tone.FeedbackDelay("8n", 0.4).connect(masterComp);
+        grainPanner = new Tone.Panner(0).connect(grainDelay);
 
-        // Master gain
-        gainMaster = audioCtx.createGain();
-        gainMaster.gain.value = 0;
-        gainMaster.connect(audioCtx.destination);
+        // Breathing drone (Always on)
+        droneVol = new Tone.Volume(-12).connect(pannerX);
+        droneFilter = new Tone.Filter(200, "lowpass").connect(droneVol);
+        droneOsc = new Tone.Oscillator(55, "sine").connect(droneFilter).start();
+        droneLfo = new Tone.LFO(0.1, 100, 400).connect(droneFilter.frequency).start();
 
-        // Compressor for smooth dynamics
-        const compressor = audioCtx.createDynamicsCompressor();
-        compressor.threshold.value = -24;
-        compressor.knee.value = 12;
-        compressor.ratio.value = 6;
-        compressor.connect(gainMaster);
+        // Setup grains
+        for (let i = 0; i < 6; i++) {
+          const synth = new Tone.FMSynth({
+            envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 },
+            modulationIndex: 2,
+            volume: -15
+          }).connect(grainPanner);
+          grainSynths.push(synth);
+        }
 
-        // Reverb wet path
-        const reverbGain = audioCtx.createGain();
-        reverbGain.gain.value = 0.3;
-        reverbGain.connect(compressor);
-
-        // Dry path
-        const dryGain = audioCtx.createGain();
-        dryGain.gain.value = 0.7;
-        dryGain.connect(compressor);
-
-        // Low drone oscillator
-        oscLow = audioCtx.createOscillator();
-        oscLow.type = 'sine';
-        oscLow.frequency.value = 55;
-        gainLow = audioCtx.createGain();
-        gainLow.gain.value = 0;
-        filterLow = audioCtx.createBiquadFilter();
-        filterLow.type = 'lowpass';
-        filterLow.frequency.value = 200;
-        filterLow.Q.value = 2;
-        oscLow.connect(gainLow);
-        gainLow.connect(filterLow);
-        filterLow.connect(dryGain);
-        filterLow.connect(reverbGain);
-        oscLow.start();
-
-        // Mid harmonic oscillator
-        oscMid = audioCtx.createOscillator();
-        oscMid.type = 'triangle';
-        oscMid.frequency.value = 110;
-        gainMid = audioCtx.createGain();
-        gainMid.gain.value = 0;
-        filterMid = audioCtx.createBiquadFilter();
-        filterMid.type = 'bandpass';
-        filterMid.frequency.value = 800;
-        filterMid.Q.value = 1.5;
-        oscMid.connect(gainMid);
-        gainMid.connect(filterMid);
-        filterMid.connect(dryGain);
-        filterMid.connect(reverbGain);
-        oscMid.start();
-
-        // High shimmer oscillator
-        oscHigh = audioCtx.createOscillator();
-        oscHigh.type = 'sine';
-        oscHigh.frequency.value = 220;
-        gainHigh = audioCtx.createGain();
-        gainHigh.gain.value = 0;
-        oscHigh.connect(gainHigh);
-        gainHigh.connect(dryGain);
-        oscHigh.start();
-
-        // LFO for tremolo
-        lfo = audioCtx.createOscillator();
-        lfo.type = 'sine';
-        lfo.frequency.value = 0.5;
-        lfoGain = audioCtx.createGain();
-        lfoGain.gain.value = 0;
-        lfo.connect(lfoGain);
-        lfoGain.connect(gainMaster.gain);
-        lfo.start();
-
+        switchModeSoundscape(mode);
         audioStarted = true;
+        masterVol.volume.rampTo(-6, 1);
+      }
+
+      function switchModeSoundscape(newMode) {
+        if (!audioStarted) return;
+        currentModeNodes.forEach(node => {
+          if (node.stop) node.stop();
+          node.dispose();
+        });
+        currentModeNodes = [];
+        
+        if (newMode === 'portrait') {
+          const chorus = new Tone.Chorus(4, 2.5, 0.5).connect(pannerX).start();
+          const pad = new Tone.Synth({ oscillator: { type: "sawtooth" } }).connect(chorus);
+          currentModeNodes.push(chorus, pad);
+          droneOsc.type = "sine";
+          masterReverb.decay = 4;
+        } else if (newMode === 'ghost') {
+          const delay = new Tone.FeedbackDelay("8n", 0.5).connect(pannerX);
+          const phaser = new Tone.Phaser({ frequency: 0.5, octaves: 3, baseFrequency: 200 }).connect(delay);
+          const noise = new Tone.Noise("pink").connect(phaser).start();
+          noise.volume.value = -20;
+          currentModeNodes.push(delay, phaser, noise);
+          droneOsc.type = "triangle";
+          masterReverb.decay = 8;
+        } else if (newMode === 'chrome') {
+          const cheby = new Tone.Chebyshev(50).connect(pannerX);
+          const fm = new Tone.FMOscillator("C2", "square", "square").connect(cheby).start();
+          fm.volume.value = -15;
+          currentModeNodes.push(cheby, fm);
+          droneOsc.type = "square";
+          masterReverb.decay = 3;
+        } else if (newMode === 'burst') {
+          const dist = new Tone.Distortion(0.8).connect(pannerX);
+          const rumble = new Tone.Noise("brown").connect(dist).start();
+          rumble.volume.value = -10;
+          currentModeNodes.push(dist, rumble);
+          droneOsc.type = "sawtooth";
+          masterReverb.decay = 2;
+        }
       }
 
       function updateAudio(handX, handY, openness, velocity) {
-        if (!audioStarted || !audioCtx || audioMuted) return;
-        const t = audioCtx.currentTime;
+        if (!audioStarted || audioMuted) return;
+        try {
+          const safePan = Math.max(-1, Math.min(1, (handX * 2) - 1)) || 0;
+          pannerX.pan.rampTo(safePan, 0.1);
+          grainPanner.pan.rampTo(safePan, 0.1);
+          
+          const yInv = 1 - (handY || 0.5);
+          const basePitch = 40 + yInv * 80;
+          droneOsc.frequency.rampTo(basePitch, 0.1);
 
-        // Master volume ramps up when hand detected
-        gainMaster.gain.linearRampToValueAtTime(0.18, t + 0.08);
+          const vel = Math.min((velocity || 0) * 40, 1);
+          droneLfo.frequency.rampTo(0.1 + vel * 5, 0.1);
 
-        // Hand Y → pitch (higher hand = higher pitch)
-        const yInv = 1 - handY;
-        const basePitch = 40 + yInv * 80;
-        oscLow.frequency.linearRampToValueAtTime(basePitch, t + 0.15);
-        oscMid.frequency.linearRampToValueAtTime(basePitch * 2, t + 0.15);
-        oscHigh.frequency.linearRampToValueAtTime(basePitch * 4.02, t + 0.15);
+          masterFilter.frequency.rampTo(300 + (openness || 0) * 15000, 0.1);
 
-        // Hand X → filter sweep
-        const filterFreq = 100 + handX * 2400;
-        filterLow.frequency.linearRampToValueAtTime(filterFreq * 0.4, t + 0.1);
-        filterMid.frequency.linearRampToValueAtTime(filterFreq, t + 0.1);
+          droneVol.volume.rampTo(-12 + (openness || 0) * 10, 0.1);
+          masterVol.volume.rampTo(-6, 0.1);
+        } catch (e) {
+          console.error("updateAudio error:", e);
+        }
+      }
 
-        // Openness → layer volumes
-        gainLow.gain.linearRampToValueAtTime(0.3 + openness * 0.2, t + 0.1);
-        gainMid.gain.linearRampToValueAtTime(openness * 0.25, t + 0.1);
-        gainHigh.gain.linearRampToValueAtTime(Math.pow(openness, 2) * 0.12, t + 0.1);
-
-        // Velocity → LFO rate + depth (faster hand = more tremolo)
-        const vel = Math.min(velocity * 40, 1);
-        lfo.frequency.linearRampToValueAtTime(0.3 + vel * 8, t + 0.1);
-        lfoGain.gain.linearRampToValueAtTime(vel * 0.06, t + 0.1);
+      let lastGrainTime = 0;
+      function triggerGrain(p) {
+        if (!audioStarted || audioMuted) return;
+        if (grainsThisFrame >= MAX_GRAINS_PER_FRAME) return;
+        try {
+          const now = Tone.now();
+          if (now - lastGrainTime < 0.02) return; 
+          
+          const synth = grainSynths[grainIndex];
+          grainIndex = (grainIndex + 1) % grainSynths.length;
+          
+          let noteIdx = Math.floor((p.brightness || 0) * (pentatonicScale.length - 1));
+          noteIdx = Math.max(0, Math.min(pentatonicScale.length - 1, noteIdx));
+          const freq = pentatonicScale[noteIdx];
+          
+          const vel = Math.max(0, Math.min(1, (p.touch || 0) * 0.5 + 0.1));
+          
+          synth.triggerAttackRelease(freq, "32n", now, vel);
+          grainsThisFrame++;
+          lastGrainTime = now;
+        } catch (e) {
+          console.error("triggerGrain error:", e);
+        }
       }
 
       function fadeAudio() {
-        if (!audioStarted || !audioCtx) return;
-        const t = audioCtx.currentTime;
-        gainMaster.gain.linearRampToValueAtTime(0, t + 0.8);
+        if (!audioStarted || !masterVol) return;
+        masterVol.volume.rampTo(-Infinity, 0.8);
       }
 
       // Mute button handler
@@ -1113,8 +1138,10 @@
         audioMuted = !audioMuted;
         this.textContent = audioMuted ? '♪ Off' : '♪ On';
         this.classList.toggle('active', !audioMuted);
-        if (audioMuted && audioStarted && audioCtx) {
-          gainMaster.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+        if (audioMuted && audioStarted && masterVol) {
+          masterVol.volume.rampTo(-Infinity, 0.2);
+        } else if (!audioMuted && audioStarted && masterVol) {
+          masterVol.volume.rampTo(-6, 0.2);
         }
       });
 
