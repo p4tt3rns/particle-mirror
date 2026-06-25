@@ -393,7 +393,7 @@
 
   <div id="perm-overlay">
     <h1>Particle Mirror</h1>
-    <p>Your face becomes matter. Move your hand to disturb the field.</p>
+    <p>Your face becomes matter. Move, open and close your hand to disturb the field.</p>
     <button id="perm-btn">Activate camera</button>
     <p id="error-msg"></p>
   </div>
@@ -1036,8 +1036,8 @@
           grainSynths.push(synth);
         }
 
-        switchModeSoundscape(mode);
         audioStarted = true;
+        switchModeSoundscape(mode);
         masterVol.volume.rampTo(-6, 1);
       }
 
