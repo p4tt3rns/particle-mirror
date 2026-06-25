@@ -1037,8 +1037,12 @@
           grainNoiseSynths.push(nSynth);
 
           const tSynth = new Tone.FMSynth({
-            envelope: { attack: 0.05, decay: 0.5, sustain: 0, release: 1 },
-            modulationIndex: 1
+            harmonicity: 2.1,
+            modulationIndex: 12,
+            oscillator: { type: "sine" },
+            envelope: { attack: 0.1, decay: 1.5, sustain: 0.1, release: 2 },
+            modulation: { type: "square" },
+            modulationEnvelope: { attack: 0.5, decay: 0.1, sustain: 1, release: 0.5 }
           }).connect(grainPanner);
           tSynth.volume.value = -16;
           grainTonalSynths.push(tSynth);
@@ -1062,21 +1066,27 @@
           const pad = new Tone.Synth({ oscillator: { type: "sawtooth" } }).connect(chorus);
           currentModeNodes.push(chorus, pad);
           droneOsc.type = "sine";
+          droneOsc.detune.value = 0;
           masterReverb.decay = 4;
         } else if (newMode === 'ghost') {
-          const delay = new Tone.FeedbackDelay("8n", 0.5).connect(pannerX);
-          const phaser = new Tone.Phaser({ frequency: 0.5, octaves: 3, baseFrequency: 200 }).connect(delay);
-          const noise = new Tone.Noise("pink").connect(phaser).start();
-          noise.volume.value = -20;
-          currentModeNodes.push(delay, phaser, noise);
-          droneOsc.type = "triangle";
-          masterReverb.decay = 8;
+          const delay = new Tone.FeedbackDelay("4n", 0.6).connect(pannerX);
+          const filter = new Tone.AutoFilter("4n", 200, 4).connect(delay).start();
+          const eerieNoise = new Tone.Noise("brown").connect(filter).start();
+          eerieNoise.volume.value = -18;
+          const tremolo = new Tone.Tremolo(4, 0.75).connect(delay).start();
+          const eerieSub = new Tone.Oscillator(55, "pwm").connect(tremolo).start();
+          eerieSub.volume.value = -15;
+          currentModeNodes.push(delay, filter, eerieNoise, tremolo, eerieSub);
+          droneOsc.type = "sine";
+          droneOsc.detune.value = 50; // Subtle dissonance
+          masterReverb.decay = 10;
         } else if (newMode === 'chrome') {
           const cheby = new Tone.Chebyshev(50).connect(pannerX);
           const fm = new Tone.FMOscillator("C2", "square", "square").connect(cheby).start();
           fm.volume.value = -15;
           currentModeNodes.push(cheby, fm);
           droneOsc.type = "square";
+          droneOsc.detune.value = 0;
           masterReverb.decay = 3;
         } else if (newMode === 'burst') {
           const dist = new Tone.Distortion(0.8).connect(pannerX);
@@ -1084,6 +1094,7 @@
           rumble.volume.value = -10;
           currentModeNodes.push(dist, rumble);
           droneOsc.type = "sawtooth";
+          droneOsc.detune.value = 0;
           masterReverb.decay = 2;
         }
       }
@@ -1119,14 +1130,17 @@
           let synth;
           if (mode === 'ghost') {
             synth = grainTonalSynths[grainIndex];
+            const noiseSynth = grainNoiseSynths[grainIndex];
             grainIndex = (grainIndex + 1) % grainTonalSynths.length;
             
-            let noteIdx = Math.floor((p.brightness || 0) * (pentatonicScale.length - 1));
-            noteIdx = Math.max(0, Math.min(pentatonicScale.length - 1, noteIdx));
-            const freq = pentatonicScale[noteIdx];
+            const mysteriousScale = [130.81, 146.83, 164.81, 185.00, 207.65, 233.08, 261.63, 293.66, 329.63, 369.99, 415.30];
+            let noteIdx = Math.floor((p.brightness || 0) * (mysteriousScale.length - 1));
+            noteIdx = Math.max(0, Math.min(mysteriousScale.length - 1, noteIdx));
+            const freq = mysteriousScale[noteIdx];
             
             const vel = Math.max(0, Math.min(1, (p.touch || 0) * 0.5 + 0.1));
-            synth.triggerAttackRelease(freq, "8n", now, vel);
+            synth.triggerAttackRelease(freq, "2n", now, vel);
+            noiseSynth.triggerAttackRelease("32n", now, vel * 0.4);
           } else {
             synth = grainNoiseSynths[grainIndex];
             grainIndex = (grainIndex + 1) % grainNoiseSynths.length;
