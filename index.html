@@ -861,6 +861,7 @@
       permBtn.addEventListener('click', startCamera);
 
       async function startCamera() {
+        if (typeof Tone !== 'undefined') await Tone.start();
         permBtn.textContent = 'Initialising…';
         permBtn.disabled = true;
         try {
@@ -874,11 +875,7 @@
             mainCanvas.width = window.innerWidth;
             mainCanvas.height = window.innerHeight;
             state.running = true;
-            if (typeof Tone !== 'undefined') {
-              Tone.start().then(() => initAudio());
-            } else {
-              initAudio();
-            }
+            initAudio();
             permOverlay.style.transition = 'opacity 0.6s';
             permOverlay.style.opacity = '0';
             setTimeout(() => permOverlay.style.display = 'none', 650);
@@ -1081,38 +1078,47 @@
 
       function updateAudio(handX, handY, openness, velocity) {
         if (!audioStarted || audioMuted) return;
-        
-        pannerX.pan.rampTo((handX * 2) - 1, 0.1);
-        
-        const yInv = 1 - handY;
-        const basePitch = 40 + yInv * 80;
-        droneOsc.frequency.rampTo(basePitch, 0.1);
+        try {
+          const safePan = Math.max(-1, Math.min(1, (handX * 2) - 1)) || 0;
+          pannerX.pan.rampTo(safePan, 0.1);
+          
+          const yInv = 1 - (handY || 0.5);
+          const basePitch = 40 + yInv * 80;
+          droneOsc.frequency.rampTo(basePitch, 0.1);
 
-        const vel = Math.min(velocity * 40, 1);
-        droneLfo.frequency.rampTo(0.1 + vel * 5, 0.1);
+          const vel = Math.min((velocity || 0) * 40, 1);
+          droneLfo.frequency.rampTo(0.1 + vel * 5, 0.1);
 
-        droneVol.volume.rampTo(-12 + openness * 10, 0.1);
-        masterVol.volume.rampTo(-6, 0.1);
+          droneVol.volume.rampTo(-12 + (openness || 0) * 10, 0.1);
+          masterVol.volume.rampTo(-6, 0.1);
+        } catch (e) {
+          console.error("updateAudio error:", e);
+        }
       }
 
       let lastGrainTime = 0;
       function triggerGrain(p) {
         if (!audioStarted || audioMuted) return;
         if (grainsThisFrame >= MAX_GRAINS_PER_FRAME) return;
-        const now = Tone.now();
-        if (now - lastGrainTime < 0.02) return; 
-        
-        const synth = grainSynths[grainIndex];
-        grainIndex = (grainIndex + 1) % grainSynths.length;
-        
-        const noteIdx = Math.floor(p.brightness * (pentatonicScale.length - 1));
-        const freq = pentatonicScale[noteIdx];
-        
-        const vel = Math.min(1, p.touch * 0.5 + 0.1);
-        
-        synth.triggerAttackRelease(freq, "32n", now, vel);
-        grainsThisFrame++;
-        lastGrainTime = now;
+        try {
+          const now = Tone.now();
+          if (now - lastGrainTime < 0.02) return; 
+          
+          const synth = grainSynths[grainIndex];
+          grainIndex = (grainIndex + 1) % grainSynths.length;
+          
+          let noteIdx = Math.floor((p.brightness || 0) * (pentatonicScale.length - 1));
+          noteIdx = Math.max(0, Math.min(pentatonicScale.length - 1, noteIdx));
+          const freq = pentatonicScale[noteIdx];
+          
+          const vel = Math.max(0, Math.min(1, (p.touch || 0) * 0.5 + 0.1));
+          
+          synth.triggerAttackRelease(freq, "32n", now, vel);
+          grainsThisFrame++;
+          lastGrainTime = now;
+        } catch (e) {
+          console.error("triggerGrain error:", e);
+        }
       }
 
       function fadeAudio() {
