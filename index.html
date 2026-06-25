@@ -364,6 +364,20 @@
       transform-origin: center center;
       will-change: transform, opacity;
       filter: drop-shadow(0 0 12px rgba(255,255,255,0.3)) drop-shadow(0 0 4px rgba(255,255,255,0.6));
+      
+      /* P4TT3RNS Custom Typography */
+      width: 937px;
+      height: 156px;
+      font-family: 'Copperplate', 'Cinzel', serif;
+      font-style: normal;
+      font-weight: 400;
+      font-size: 150px;
+      line-height: 154px;
+      text-align: center;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
   </style>
 
@@ -407,28 +421,7 @@
   <div class="crosshair"></div>
 
   <!-- P4TT3RNS hand logo -->
-  <div id="hand-logo">
-    <svg viewBox="0 0 770 106" xmlns="http://www.w3.org/2000/svg" width="160" height="22">
-      <g fill="white">
-        <!-- P -->
-        <path d="M0,0 L0,106 L18,106 L18,62 L50,62 C74,62 86,48 86,31 C86,14 74,0 50,0 Z M18,16 L48,16 C64,16 68,24 68,31 C68,38 64,46 48,46 L18,46 Z"/>
-        <!-- 4 -->
-        <path d="M106,0 L106,66 L92,66 L92,82 L106,82 L106,106 L124,106 L124,82 L154,82 L154,66 L124,66 L124,0 Z M124,16 L124,66 L106,66 L106,42 Z"/>
-        <!-- T -->
-        <path d="M168,0 L168,16 L196,16 L196,106 L214,106 L214,16 L242,16 L242,0 Z"/>
-        <!-- T -->
-        <path d="M258,0 L258,16 L286,16 L286,106 L304,106 L304,16 L332,16 L332,0 Z"/>
-        <!-- 3 -->
-        <path d="M360,8 C368,2 380,0 392,0 C416,0 432,12 432,30 C432,42 424,50 414,54 C426,58 436,68 436,82 C436,98 420,106 394,106 C380,106 366,102 356,94 L366,80 C374,86 384,90 394,90 C408,90 418,84 418,76 C418,66 408,60 392,60 L382,60 L382,46 L392,46 C406,46 414,40 414,32 C414,22 406,16 394,16 C384,16 374,20 366,26 Z"/>
-        <!-- R -->
-        <path d="M458,0 L458,106 L476,106 L476,62 L502,62 L526,106 L546,106 L520,60 C534,54 542,42 542,30 C542,12 528,0 506,0 Z M476,16 L504,16 C518,16 524,24 524,32 C524,40 518,46 504,46 L476,46 Z"/>
-        <!-- N -->
-        <path d="M566,0 L566,106 L584,106 L584,30 L640,106 L656,106 L656,0 L638,0 L638,76 L584,0 Z"/>
-        <!-- S -->
-        <path d="M688,8 C698,2 712,0 724,0 C750,0 768,12 768,30 C768,50 750,58 730,62 C712,66 700,70 700,82 C700,90 708,96 724,96 C736,96 748,92 758,84 L766,98 C754,106 738,110 722,110 C696,110 680,96 680,80 C680,60 698,52 718,48 C738,44 750,38 750,28 C750,20 742,14 726,14 C714,14 702,18 692,26 Z"/>
-      </g>
-    </svg>
-  </div>
+  <div id="hand-logo">P4TT3RNS</div>
 
   <div class="sliders">
     <div class="slider-row">
@@ -767,7 +760,10 @@
         // Update P4TT3RNS hand logo position/scale
         const handLogo = document.getElementById('hand-logo');
         if (state.handActive && ix > -900) {
-          const logoScale = 0.5 + handOpen * 1.8;
+          // Since the text element is naturally 937px wide, we scale it down to fit the hand nicely.
+          // At handOpen = 0 (closed), scale is 0.15 (~140px wide).
+          // At handOpen = 1 (open), scale is 0.55 (~515px wide).
+          const logoScale = 0.15 + handOpen * 0.40;
           const logoOpacity = 0.5 + handOpen * 0.5;
           handLogo.style.opacity = logoOpacity;
           handLogo.style.left = ix + 'px';
