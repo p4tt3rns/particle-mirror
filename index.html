@@ -440,8 +440,8 @@
 
   <div class="bottombar">
     <div class="controls">
-      <button class="ctrl-btn" id="btn-portrait" data-mode="portrait">Portrait</button>
-      <button class="ctrl-btn active" id="btn-ghost" data-mode="ghost">Ghost</button>
+      <button class="ctrl-btn active" id="btn-portrait" data-mode="portrait">Portrait</button>
+      <button class="ctrl-btn" id="btn-ghost" data-mode="ghost">Ghost</button>
       <button class="ctrl-btn" id="btn-chrome" data-mode="chrome">Chrome</button>
       <button class="ctrl-btn" id="btn-burst" data-mode="burst">Burst</button>
       <button class="ctrl-btn active" id="btn-mute" style="margin-left:12px;border-color:rgba(255,255,255,0.22)">♪
@@ -468,7 +468,7 @@
       const W = () => mainCanvas.width;
       const H = () => mainCanvas.height;
 
-      let mode = 'ghost';
+      let mode = 'portrait';
       let density = 1.00, scatter = 0.00, repulse = 0.55, threshold = 0.65;
       let audioMuted = false;
 
@@ -998,7 +998,8 @@
       let grainDelay, grainPanner;
       let droneOsc, droneFilter, droneLfo, droneVol;
       let currentModeNodes = [];
-      let grainSynths = [];
+      let grainNoiseSynths = [];
+      let grainTonalSynths = [];
       let grainIndex = 0;
       const MAX_GRAINS_PER_FRAME = 2;
       
@@ -1028,12 +1029,19 @@
 
         // Setup grains
         for (let i = 0; i < 6; i++) {
-          const synth = new Tone.NoiseSynth({
+          const nSynth = new Tone.NoiseSynth({
             noise: { type: 'pink' },
             envelope: { attack: 0.001, decay: 0.04, sustain: 0 }
           }).connect(grainPanner);
-          synth.volume.value = -12;
-          grainSynths.push(synth);
+          nSynth.volume.value = -12;
+          grainNoiseSynths.push(nSynth);
+
+          const tSynth = new Tone.FMSynth({
+            envelope: { attack: 0.05, decay: 0.5, sustain: 0, release: 1 },
+            modulationIndex: 1
+          }).connect(grainPanner);
+          tSynth.volume.value = -16;
+          grainTonalSynths.push(tSynth);
         }
 
         audioStarted = true;
@@ -1091,9 +1099,6 @@
           const basePitch = 40 + yInv * 80;
           droneOsc.frequency.rampTo(basePitch, 0.1);
 
-          const vel = Math.min((velocity || 0) * 40, 1);
-          droneLfo.frequency.rampTo(0.1 + vel * 5, 0.1);
-
           masterFilter.frequency.rampTo(300 + (openness || 0) * 15000, 0.1);
 
           droneVol.volume.rampTo(-12 + (openness || 0) * 10, 0.1);
@@ -1111,12 +1116,25 @@
           const now = Tone.now();
           if (now - lastGrainTime < 0.02) return; 
           
-          const synth = grainSynths[grainIndex];
-          grainIndex = (grainIndex + 1) % grainSynths.length;
+          let synth;
+          if (mode === 'ghost') {
+            synth = grainTonalSynths[grainIndex];
+            grainIndex = (grainIndex + 1) % grainTonalSynths.length;
+            
+            let noteIdx = Math.floor((p.brightness || 0) * (pentatonicScale.length - 1));
+            noteIdx = Math.max(0, Math.min(pentatonicScale.length - 1, noteIdx));
+            const freq = pentatonicScale[noteIdx];
+            
+            const vel = Math.max(0, Math.min(1, (p.touch || 0) * 0.5 + 0.1));
+            synth.triggerAttackRelease(freq, "8n", now, vel);
+          } else {
+            synth = grainNoiseSynths[grainIndex];
+            grainIndex = (grainIndex + 1) % grainNoiseSynths.length;
+            
+            const vel = Math.max(0, Math.min(1, (p.touch || 0) * 0.5 + 0.1));
+            synth.triggerAttackRelease("64n", now, vel);
+          }
           
-          const vel = Math.max(0, Math.min(1, (p.touch || 0) * 0.5 + 0.1));
-          
-          synth.triggerAttackRelease("64n", now, vel);
           grainsThisFrame++;
           lastGrainTime = now;
         } catch (e) {
