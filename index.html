@@ -406,7 +406,6 @@
             <path
               d="M54.6 36.6001C57.9 36.6001 60.7 35.9501 63 34.6501C65.4 33.3501 66.6 30.8001 66.6 27.0001C66.6 23.2001 65.4 20.6501 63 19.3501C60.7 18.0501 57.9 17.4001 54.6 17.4001H22.65V36.6001H54.6Z" />
             <path d="M143.849 18.9001L109.949 56.1001H143.849V18.9001Z" />
-            <path d="M234.648 77.1C234.648 78.9 235.748 79.8 237.948 79.8V82.5H214.848V79.8" />
           </g>
         </svg>
       </div>
@@ -995,7 +994,8 @@
       let grainsThisFrame = 0;
       
       // Nodes
-      let masterVol, masterComp, masterReverb, pannerX;
+      let masterVol, masterFilter, masterComp, masterReverb, pannerX;
+      let grainDelay, grainPanner;
       let droneOsc, droneFilter, droneLfo, droneVol;
       let currentModeNodes = [];
       let grainSynths = [];
@@ -1009,13 +1009,16 @@
         await Tone.start();
         
         masterVol = new Tone.Volume(-Infinity).toDestination();
-        masterComp = new Tone.Compressor({ threshold: -24, ratio: 6, knee: 12 });
+        masterFilter = new Tone.Filter(15000, "lowpass").connect(masterVol);
+        masterComp = new Tone.Compressor({ threshold: -24, ratio: 6, knee: 12 }).connect(masterFilter);
         masterReverb = new Tone.Reverb({ decay: 4 }).connect(masterComp);
         masterReverb.wet.value = 0.4;
         await masterReverb.ready;
         
         pannerX = new Tone.Panner(0).connect(masterReverb);
-        masterComp.connect(masterVol);
+        
+        grainDelay = new Tone.FeedbackDelay("8n", 0.4).connect(masterComp);
+        grainPanner = new Tone.Panner(0).connect(grainDelay);
 
         // Breathing drone (Always on)
         droneVol = new Tone.Volume(-12).connect(pannerX);
@@ -1028,7 +1031,7 @@
           const synth = new Tone.FMSynth({
             envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 },
             modulationIndex: 2
-          }).connect(pannerX);
+          }).connect(grainPanner);
           grainSynths.push(synth);
         }
 
@@ -1081,6 +1084,7 @@
         try {
           const safePan = Math.max(-1, Math.min(1, (handX * 2) - 1)) || 0;
           pannerX.pan.rampTo(safePan, 0.1);
+          grainPanner.pan.rampTo(safePan, 0.1);
           
           const yInv = 1 - (handY || 0.5);
           const basePitch = 40 + yInv * 80;
@@ -1088,6 +1092,8 @@
 
           const vel = Math.min((velocity || 0) * 40, 1);
           droneLfo.frequency.rampTo(0.1 + vel * 5, 0.1);
+
+          masterFilter.frequency.rampTo(300 + (openness || 0) * 15000, 0.1);
 
           droneVol.volume.rampTo(-12 + (openness || 0) * 10, 0.1);
           masterVol.volume.rampTo(-6, 0.1);
