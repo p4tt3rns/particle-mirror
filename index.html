@@ -691,7 +691,7 @@
               const proximity = 1 - dist / inflationR;
               // Smooth cubic ease-out curve instead of linear
               const smoothProx = proximity * proximity * (3 - 2 * proximity);
-              sizeInflation = 1 + handOpen * smoothProx * 3.0;
+              sizeInflation = 1 + handOpen * smoothProx * 1.5;
             }
           }
 
