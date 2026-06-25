@@ -426,22 +426,22 @@
   <div class="sliders">
     <div class="slider-row">
       <span class="slider-label">Density</span>
-      <input id="s-density" type="range" min="1" max="100" value="68">
+      <input id="s-density" type="range" min="1" max="100" value="100">
     </div>
     <div class="slider-row">
       <span class="slider-label">Scatter</span>
-      <input id="s-scatter" type="range" min="0" max="100" value="40">
+      <input id="s-scatter" type="range" min="0" max="100" value="0">
     </div>
     <div class="slider-row">
       <span class="slider-label">Threshold</span>
-      <input id="s-thresh" type="range" min="0" max="100" value="28">
+      <input id="s-thresh" type="range" min="0" max="100" value="65">
     </div>
   </div>
 
   <div class="bottombar">
     <div class="controls">
-      <button class="ctrl-btn active" id="btn-portrait" data-mode="portrait">Portrait</button>
-      <button class="ctrl-btn" id="btn-ghost" data-mode="ghost">Ghost</button>
+      <button class="ctrl-btn" id="btn-portrait" data-mode="portrait">Portrait</button>
+      <button class="ctrl-btn active" id="btn-ghost" data-mode="ghost">Ghost</button>
       <button class="ctrl-btn" id="btn-chrome" data-mode="chrome">Chrome</button>
       <button class="ctrl-btn" id="btn-burst" data-mode="burst">Burst</button>
       <button class="ctrl-btn active" id="btn-mute" style="margin-left:12px;border-color:rgba(255,255,255,0.22)">♪
@@ -468,8 +468,8 @@
       const W = () => mainCanvas.width;
       const H = () => mainCanvas.height;
 
-      let mode = 'portrait';
-      let density = 0.68, scatter = 0.40, repulse = 0.55, threshold = 0.28;
+      let mode = 'ghost';
+      let density = 1.00, scatter = 0.00, repulse = 0.55, threshold = 0.65;
       let audioMuted = false;
 
       const state = {
@@ -1028,11 +1028,11 @@
 
         // Setup grains
         for (let i = 0; i < 6; i++) {
-          const synth = new Tone.FMSynth({
-            envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 },
-            modulationIndex: 2,
-            volume: -15
+          const synth = new Tone.NoiseSynth({
+            noise: { type: 'pink' },
+            envelope: { attack: 0.001, decay: 0.04, sustain: 0 }
           }).connect(grainPanner);
+          synth.volume.value = -12;
           grainSynths.push(synth);
         }
 
@@ -1114,13 +1114,9 @@
           const synth = grainSynths[grainIndex];
           grainIndex = (grainIndex + 1) % grainSynths.length;
           
-          let noteIdx = Math.floor((p.brightness || 0) * (pentatonicScale.length - 1));
-          noteIdx = Math.max(0, Math.min(pentatonicScale.length - 1, noteIdx));
-          const freq = pentatonicScale[noteIdx];
-          
           const vel = Math.max(0, Math.min(1, (p.touch || 0) * 0.5 + 0.1));
           
-          synth.triggerAttackRelease(freq, "32n", now, vel);
+          synth.triggerAttackRelease("64n", now, vel);
           grainsThisFrame++;
           lastGrainTime = now;
         } catch (e) {
