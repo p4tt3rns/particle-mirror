@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>P4TT3RNS — PARTICLE MIRROR</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,700&display=swap" rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Satoshi', 'Arial', sans-serif;
+      color: #fff;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #main-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Hidden video for capture */
+    #video {
+      position: fixed;
+      top: -9999px;
+      left: -9999px;
+      width: 320px;
+      height: 240px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #pixel-canvas {
+      position: fixed;
+      top: -9999px;
+      left: -9999px;
+      width: 320px;
+      height: 240px;
+      pointer-events: none;
+    }
+
+    /* UI overlay */
+    .ui-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* Top bar */
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 28px;
+      z-index: 20;
+      pointer-events: none;
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0) 100%);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      display: grid;
+      place-items: center;
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    .brand-mark svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .brand-text {
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.85);
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+    }
+
+    .topbar-right {
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.7);
+      text-align: right;
+      line-height: 1.8;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+    }
+
+    .live-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #fff;
+      margin-right: 6px;
+      animation: blink 2s ease infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 0.9;
+      }
+
+      50% {
+        opacity: 0.2;
+      }
+    }
+
+    /* Bottom bar */
+    .bottombar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding: 20px 28px 24px;
+      z-index: 20;
+      pointer-events: auto;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0) 100%);
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .ctrl-btn {
+      pointer-events: auto;
+      height: 38px;
+      padding: 0 18px;
+      border-radius: 100px;
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      background: rgba(0, 0, 0, 0.6);
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: background 180ms, color 180ms, border-color 180ms;
+      font-family: 'Satoshi', sans-serif;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+    }
+
+    .ctrl-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.6);
+      color: #fff;
+    }
+
+    .ctrl-btn.active {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: rgba(255, 255, 255, 0.75);
+      color: #fff;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 2px 16px rgba(0, 0, 0, 0.6);
+    }
+
+    .stats {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.55);
+      text-align: right;
+      line-height: 2;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+    }
+
+    /* Sliders panel */
+    .sliders {
+      position: fixed;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      z-index: 20;
+      pointer-events: auto;
+      background: rgba(0, 0, 0, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 18px 16px;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+    }
+
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-end;
+    }
+
+    .slider-label {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.65);
+      font-family: 'Courier New', monospace;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 90px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.18);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.6), 0 0 20px rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+    }
+
+    /* Permissions overlay */
+    #perm-overlay {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      z-index: 100;
+    }
+
+    #perm-overlay h1 {
+      font-size: clamp(1.4rem, 4vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      text-align: center;
+      max-width: 16ch;
+      line-height: 1.08;
+    }
+
+    #perm-overlay p {
+      color: rgba(255, 255, 255, 0.45);
+      font-size: 13px;
+      letter-spacing: 0.05em;
+      text-align: center;
+      max-width: 36ch;
+      line-height: 1.7;
+    }
+
+    #perm-btn {
+      margin-top: 8px;
+      height: 48px;
+      padding: 0 32px;
+      border-radius: 100px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-family: 'Satoshi', sans-serif;
+      transition: background 180ms, border-color 180ms;
+    }
+
+    #perm-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.7);
+    }
+
+    #error-msg {
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-align: center;
+      display: none;
+      max-width: 36ch;
+      line-height: 1.7;
+    }
+
+    /* Crosshair decoration */
+    .crosshair {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      pointer-events: none;
+      opacity: 0.08;
+      z-index: 5;
+    }
+
+    .crosshair::before,
+    .crosshair::after {
+      content: '';
+      position: absolute;
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .crosshair::before {
+      width: 1px;
+      height: 100%;
+      left: 50%;
+      top: 0;
+    }
+
+    .crosshair::after {
+      height: 1px;
+      width: 100%;
+      top: 50%;
+      left: 0;
+    }
+
+    /* Hand logo overlay */
+    #hand-logo {
+      position: fixed;
+      pointer-events: none;
+      z-index: 6;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      transform-origin: center center;
+      will-change: transform, opacity;
+      filter: drop-shadow(0 0 12px rgba(255,255,255,0.3)) drop-shadow(0 0 4px rgba(255,255,255,0.6));
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+</head>
+
+<body>
+
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="pixel-canvas"></canvas>
+  <canvas id="main-canvas"></canvas>
+
+  <div id="perm-overlay">
+    <h1>Particle Mirror</h1>
+    <p>Your face becomes matter. Move your hand to disturb the field.</p>
+    <button id="perm-btn">Activate camera</button>
+    <p id="error-msg"></p>
+  </div>
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 770 194" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <g fill="none" stroke="currentColor" stroke-width="8">
+            <path
+              d="M54.6 36.6001C57.9 36.6001 60.7 35.9501 63 34.6501C65.4 33.3501 66.6 30.8001 66.6 27.0001C66.6 23.2001 65.4 20.6501 63 19.3501C60.7 18.0501 57.9 17.4001 54.6 17.4001H22.65V36.6001H54.6Z" />
+            <path d="M143.849 18.9001L109.949 56.1001H143.849V18.9001Z" />
+            <path d="M234.648 77.1C234.648 78.9 235.748 79.8 237.948 79.8V82.5H214.848V79.8" />
+          </g>
+        </svg>
+      </div>
+      <span class="brand-text">P4TT3RNS / LAB — Particle Mirror</span>
+    </div>
+    <div class="topbar-right" id="topbar-stats">
+      <span class="live-dot"></span>LIVE<br>
+      <span id="stat-particles">0</span> particles<br>
+      <span id="stat-mode">portrait</span>
+    </div>
+  </div>
+
+  <div class="crosshair"></div>
+
+  <!-- P4TT3RNS hand logo -->
+  <div id="hand-logo">
+    <svg viewBox="0 0 770 106" xmlns="http://www.w3.org/2000/svg" width="160" height="22">
+      <g fill="white">
+        <!-- P -->
+        <path d="M0,0 L0,106 L18,106 L18,62 L50,62 C74,62 86,48 86,31 C86,14 74,0 50,0 Z M18,16 L48,16 C64,16 68,24 68,31 C68,38 64,46 48,46 L18,46 Z"/>
+        <!-- 4 -->
+        <path d="M106,0 L106,66 L92,66 L92,82 L106,82 L106,106 L124,106 L124,82 L154,82 L154,66 L124,66 L124,0 Z M124,16 L124,66 L106,66 L106,42 Z"/>
+        <!-- T -->
+        <path d="M168,0 L168,16 L196,16 L196,106 L214,106 L214,16 L242,16 L242,0 Z"/>
+        <!-- T -->
+        <path d="M258,0 L258,16 L286,16 L286,106 L304,106 L304,16 L332,16 L332,0 Z"/>
+        <!-- 3 -->
+        <path d="M360,8 C368,2 380,0 392,0 C416,0 432,12 432,30 C432,42 424,50 414,54 C426,58 436,68 436,82 C436,98 420,106 394,106 C380,106 366,102 356,94 L366,80 C374,86 384,90 394,90 C408,90 418,84 418,76 C418,66 408,60 392,60 L382,60 L382,46 L392,46 C406,46 414,40 414,32 C414,22 406,16 394,16 C384,16 374,20 366,26 Z"/>
+        <!-- R -->
+        <path d="M458,0 L458,106 L476,106 L476,62 L502,62 L526,106 L546,106 L520,60 C534,54 542,42 542,30 C542,12 528,0 506,0 Z M476,16 L504,16 C518,16 524,24 524,32 C524,40 518,46 504,46 L476,46 Z"/>
+        <!-- N -->
+        <path d="M566,0 L566,106 L584,106 L584,30 L640,106 L656,106 L656,0 L638,0 L638,76 L584,0 Z"/>
+        <!-- S -->
+        <path d="M688,8 C698,2 712,0 724,0 C750,0 768,12 768,30 C768,50 750,58 730,62 C712,66 700,70 700,82 C700,90 708,96 724,96 C736,96 748,92 758,84 L766,98 C754,106 738,110 722,110 C696,110 680,96 680,80 C680,60 698,52 718,48 C738,44 750,38 750,28 C750,20 742,14 726,14 C714,14 702,18 692,26 Z"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="sliders">
+    <div class="slider-row">
+      <span class="slider-label">Density</span>
+      <input id="s-density" type="range" min="1" max="100" value="68">
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">Scatter</span>
+      <input id="s-scatter" type="range" min="0" max="100" value="40">
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">Threshold</span>
+      <input id="s-thresh" type="range" min="0" max="100" value="28">
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <div class="controls">
+      <button class="ctrl-btn active" id="btn-portrait" data-mode="portrait">Portrait</button>
+      <button class="ctrl-btn" id="btn-ghost" data-mode="ghost">Ghost</button>
+      <button class="ctrl-btn" id="btn-chrome" data-mode="chrome">Chrome</button>
+      <button class="ctrl-btn" id="btn-burst" data-mode="burst">Burst</button>
+      <button class="ctrl-btn active" id="btn-mute" style="margin-left:12px;border-color:rgba(255,255,255,0.22)">♪ On</button>
+    </div>
+    <div class="stats" id="hand-stats">
+      hand x — <br>
+      hand y — <br>
+      field ∅
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const video = document.getElementById('video');
+      const pixelCanvas = document.getElementById('pixel-canvas');
+      const mainCanvas = document.getElementById('main-canvas');
+      const pixCtx = pixelCanvas.getContext('2d', { willReadFrequently: true });
+      const ctx = mainCanvas.getContext('2d');
+      const permOverlay = document.getElementById('perm-overlay');
+      const permBtn = document.getElementById('perm-btn');
+      const errorMsg = document.getElementById('error-msg');
+
+      const W = () => mainCanvas.width;
+      const H = () => mainCanvas.height;
+
+      let mode = 'portrait';
+      let density = 0.68, scatter = 0.40, repulse = 0.55, threshold = 0.28;
+      let audioMuted = false;
+
+      const state = {
+        running: false,
+        handX: -1,
+        handY: -1,
+        handSX: 0.5,
+        handSY: 0.5,
+        handActive: false,
+        handOpenness: 0,
+        prevHandX: -1,
+        prevHandY: -1,
+        handVelX: 0,
+        handVelY: 0,
+        mouseX: -1,
+        mouseY: -1,
+        frame: 0,
+        particles: [],
+        targetParticleCount: 0,
+      };
+
+      let hands = null;
+
+
+      // ---- Particle system ----
+      // Dynamic MAX_P: scales with screen area. ~50k base, up to 120k for large/4K screens
+      const screenArea = window.innerWidth * window.innerHeight;
+      let MAX_P = Math.min(120000, Math.max(50000, Math.round(screenArea * 0.04)));
+      const particles = [];
+
+      // Recalculate on resize
+      window.addEventListener('resize', () => {
+        const area = window.innerWidth * window.innerHeight;
+        MAX_P = Math.min(120000, Math.max(50000, Math.round(area * 0.04)));
+      });
+
+      function Particle(x, y, brightness) {
+        this.ox = x; this.oy = y;
+        this.x = x + (Math.random() - 0.5) * 8;
+        this.y = y + (Math.random() - 0.5) * 8;
+        this.vx = 0; this.vy = 0;
+        this.brightness = brightness;
+        this.size = 0.22 + brightness * 0.9 + Math.random() * 0.35;
+        this.alpha = 0.3 + brightness * 0.7;
+        this.chromatic = Math.random() < 0.03; // 3% chrome particles
+        this.noiseOff = Math.random() * 1000;
+        this.life = 1;
+        this.touch = 0; // how recently this particle was affected by the hand
+      }
+
+      // Simple Perlin-ish noise (value noise)
+      const noiseTable = new Float32Array(512);
+      for (let i = 0; i < 512; i++) noiseTable[i] = Math.random() * 2 - 1;
+      function noise(x, y, t) {
+        const ix = Math.floor(x) & 255, iy = Math.floor(y) & 255, it = Math.floor(t) & 255;
+        return noiseTable[(ix + iy * 57 + it * 131) & 511];
+      }
+
+      // ---- Webcam sampling ----
+      const SAMPLE_W = 160;
+      const SAMPLE_H = 120;
+
+      function sampleFrame() {
+        pixCtx.save();
+        pixCtx.scale(-1, 1); // mirror
+        pixCtx.drawImage(video, -SAMPLE_W, 0, SAMPLE_W, SAMPLE_H);
+        pixCtx.restore();
+        return pixCtx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
+      }
+
+      function rebuildParticles(imageData) {
+        const data = imageData.data;
+        const scaleX = W() / SAMPLE_W;
+        const scaleY = H() / SAMPLE_H;
+        const scatterPx = scatter * 14;
+        const thresh = threshold * 200 + 20;
+        const skip = Math.max(1, Math.round(2.5 - density * 1.8));
+
+        particles.length = 0;
+
+        for (let py = 0; py < SAMPLE_H; py += skip) {
+          for (let px = 0; px < SAMPLE_W; px += skip) {
+            const idx = (py * SAMPLE_W + px) * 4;
+            const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (lum < thresh) continue;
+            const brightness = lum / 255;
+
+            // Multiple particles per bright pixel based on brightness
+            const count = mode === 'burst' ? 1 : (brightness > 0.7 ? 2 : 1);
+            for (let c = 0; c < count; c++) {
+              if (particles.length >= MAX_P) break;
+              const sx = scatterPx * (Math.random() - 0.5);
+              const sy = scatterPx * (Math.random() - 0.5);
+              const p = new Particle(
+                px * scaleX + sx,
+                py * scaleY + sy,
+                brightness
+              );
+              if (mode === 'ghost') {
+                p.alpha *= 0.4;
+                p.size *= 1.6;
+              }
+              if (mode === 'chrome') {
+                p.chromatic = Math.random() < 0.18;
+              }
+              particles.push(p);
+            }
+          }
+        }
+        document.getElementById('stat-particles').textContent = particles.length.toLocaleString();
+      }
+
+      // ---- Rendering ----
+      // Chrome gradient — precomputed
+      function getChromeGradient(ctx, x, y, r) {
+        const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r * 2.2);
+        g.addColorStop(0, 'rgba(255,255,255,1)');
+        g.addColorStop(0.25, 'rgba(210,210,210,0.95)');
+        g.addColorStop(0.5, 'rgba(140,140,140,0.85)');
+        g.addColorStop(0.75, 'rgba(40,40,40,0.7)');
+        g.addColorStop(1, 'rgba(200,200,200,0.4)');
+        return g;
+      }
+
+      let frameCount = 0;
+      let lastRebuild = 0;
+      const REBUILD_INTERVAL = 80; // ms between full particle rebuild from video
+
+      function draw(ts) {
+        if (!state.running) return;
+        requestAnimationFrame(draw);
+
+        frameCount++;
+        const t = ts * 0.001;
+
+        // Resize if needed
+        if (mainCanvas.width !== window.innerWidth || mainCanvas.height !== window.innerHeight) {
+          mainCanvas.width = window.innerWidth;
+          mainCanvas.height = window.innerHeight;
+        }
+
+        // Rebuild particles from video at intervals
+        if (state.running && video.readyState >= 2 && ts - lastRebuild > REBUILD_INTERVAL) {
+          pixelCanvas.width = SAMPLE_W;
+          pixelCanvas.height = SAMPLE_H;
+          const imageData = sampleFrame();
+          rebuildParticles(imageData);
+          lastRebuild = ts;
+        }
+
+        // Clear
+        if (mode === 'ghost') {
+          ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        } else {
+          ctx.fillStyle = 'rgba(0,0,0,0.82)';
+        }
+        ctx.fillRect(0, 0, W(), H());
+
+        // Get interaction point
+        const ix = state.handActive ? state.handX * W() : -999;
+        const iy = state.handActive ? state.handY * H() : -999;
+        const repulseR = 80 + repulse * 260;
+        const repulseStr = 0.3 + repulse * 2.4;
+
+        // Hand openness drives particle size inflation in range
+        const handOpen = state.handOpenness;
+
+        // Update + draw particles
+        ctx.save();
+
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+
+          // Noise drift (slowed down significantly)
+          const nx = noise(p.ox * 0.008, p.oy * 0.008, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.15);
+          const ny = noise(p.ox * 0.008 + 100, p.oy * 0.008 + 100, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.15);
+
+          // Repulsion from hand/mouse
+          let fx = 0, fy = 0;
+          if (ix > -900) {
+            const dx = p.x - ix;
+            const dy = p.y - iy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < repulseR && dist > 0.5) {
+              const force = Math.pow(1 - dist / repulseR, 1.8) * repulseStr;
+              fx = (dx / dist) * force * 4;
+              fy = (dy / dist) * force * 4;
+              p.touch = 1;
+            }
+          }
+
+          p.vx = (p.vx + fx + nx * 0.1) * 0.86;
+          p.vy = (p.vy + fy + ny * 0.1) * 0.86;
+
+          // Return to origin
+          const returnStr = mode === 'burst' ? 0.006 : 0.014;
+          p.vx += (p.ox - p.x) * returnStr;
+          p.vy += (p.oy - p.y) * returnStr;
+
+          p.x += p.vx;
+          p.y += p.vy;
+
+          // touch decay for trail effect
+          p.touch *= 0.9;
+
+          // Draw
+          const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+          const speedBoost = Math.min(speed * 0.12, 0.5);
+
+          // Inflate particle size based on hand openness + proximity
+          // Uses smooth cubic easing to prevent trembling
+          let sizeInflation = 1;
+          if (state.handActive && handOpen > 0.05) {
+            const dx = p.x - ix;
+            const dy = p.y - iy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const inflationR = repulseR * 2.5;
+            if (dist < inflationR) {
+              const proximity = 1 - dist / inflationR;
+              // Smooth cubic ease-out curve instead of linear
+              const smoothProx = proximity * proximity * (3 - 2 * proximity);
+              sizeInflation = 1 + handOpen * smoothProx * 3.0;
+            }
+          }
+
+          if (p.chromatic && mode !== 'portrait') {
+            // Chrome/metallic particle
+            const r = p.size * (1 + speedBoost * 1.5 + p.touch * 0.8) * sizeInflation;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+            ctx.fillStyle = getChromeGradient(ctx, p.x, p.y, r);
+            ctx.globalAlpha = p.alpha;
+            ctx.fill();
+
+            // Specular highlight
+            ctx.beginPath();
+            ctx.arc(p.x - r * 0.25, p.y - r * 0.25, r * 0.22, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.globalAlpha = 0.6;
+            ctx.fill();
+          } else if (p.chromatic) {
+            // In portrait mode, chrome particles still have a subtle metallic look
+            const r = p.size * (1.1 + p.touch * 0.7) * sizeInflation;
+            const lum = Math.round(p.brightness * 255);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${lum},${lum},${lum},${p.alpha * 0.9})`;
+            ctx.globalAlpha = 1;
+            // thin ring
+            ctx.strokeStyle = `rgba(255,255,255,0.55)`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+            ctx.fill();
+          } else {
+            // Standard monochrome particle
+            const lum = Math.round(p.brightness * 255);
+            const a = Math.min(1, p.alpha + speedBoost);
+            const baseR = p.size * (1 + speedBoost * 0.5 + p.touch * 0.9) * sizeInflation;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, baseR, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${lum},${lum},${lum},${a})`;
+            ctx.globalAlpha = 1;
+            ctx.fill();
+          }
+        }
+
+        ctx.restore();
+
+        // Draw hand cursor indicator
+        if (state.handActive || state.mouseX >= 0) {
+          const cx = ix, cy = iy;
+          ctx.save();
+          ctx.globalAlpha = 0.18;
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.arc(cx, cy, repulseR, 0, Math.PI * 2);
+          ctx.stroke();
+          // inner dot
+          ctx.globalAlpha = 0.5;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff';
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Update P4TT3RNS hand logo position/scale
+        const handLogo = document.getElementById('hand-logo');
+        if (state.handActive && ix > -900) {
+          const logoScale = 0.5 + handOpen * 1.8;
+          const logoOpacity = 0.5 + handOpen * 0.5;
+          handLogo.style.opacity = logoOpacity;
+          handLogo.style.left = ix + 'px';
+          handLogo.style.top = iy + 'px';
+          handLogo.style.transform = `translate(-50%, -50%) scale(${logoScale})`;
+        } else {
+          handLogo.style.opacity = '0';
+        }
+
+        // Mode-specific overlays
+        if (mode === 'chrome') drawChromeRing(ctx, t);
+        if (mode === 'burst') drawBurstHalo(ctx, ix, iy, t);
+
+        // Update stats
+        document.getElementById('hand-stats').innerHTML =
+          `hand x ${state.handActive ? state.handX.toFixed(2) : '—'}<br>` +
+          `hand y ${state.handActive ? state.handY.toFixed(2) : '—'}<br>` +
+          `field ∅ ${Math.round(repulseR)}px`;
+      }
+
+      function drawChromeRing(ctx, t) {
+        const cx = W() / 2, cy = H() / 2;
+        const r = Math.min(W(), H()) * 0.38;
+        ctx.save();
+        ctx.globalAlpha = 0.06 + Math.sin(t * 0.7) * 0.02;
+        const g = ctx.createConicalGradient ? null : null; // fallback
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, r * (0.88 + i * 0.08) + Math.sin(t + i) * 6, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawBurstHalo(ctx, ix, iy, t) {
+        if (ix < 0) return;
+        ctx.save();
+        for (let i = 0; i < 3; i++) {
+          const r = 60 + i * 40 + Math.sin(t * 3 + i) * 12;
+          ctx.beginPath();
+          ctx.arc(ix, iy, r, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255,255,255,${0.05 - i * 0.012})`;
+          ctx.lineWidth = 0.8;
+          ctx.globalAlpha = 1;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // ---- Mouse as hand fallback ----
+      mainCanvas.addEventListener('mousemove', e => {
+        state.mouseX = e.clientX;
+        state.mouseY = e.clientY;
+      });
+      mainCanvas.addEventListener('mouseleave', () => {
+        state.mouseX = -1;
+        state.mouseY = -1;
+      });
+
+      // Touch
+      mainCanvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+        const t = e.touches[0];
+        state.mouseX = t.clientX;
+        state.mouseY = t.clientY;
+      }, { passive: false });
+      mainCanvas.addEventListener('touchend', () => {
+        state.mouseX = -1;
+        state.mouseY = -1;
+      });
+
+      // ---- Mode buttons ----
+      document.querySelectorAll('[data-mode]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          mode = btn.dataset.mode;
+          document.getElementById('stat-mode').textContent = mode;
+          document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
+        });
+      });
+
+      // ---- Sliders ----
+      document.getElementById('s-density').addEventListener('input', e => { density = e.target.value / 100; });
+      document.getElementById('s-scatter').addEventListener('input', e => { scatter = e.target.value / 100; });
+      document.getElementById('s-thresh').addEventListener('input', e => { threshold = e.target.value / 100; });
+
+      // ---- Camera init ----
+      permBtn.addEventListener('click', startCamera);
+
+      async function startCamera() {
+        permBtn.textContent = 'Initialising…';
+        permBtn.disabled = true;
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+            audio: false
+          });
+          video.srcObject = stream;
+          video.onloadedmetadata = () => {
+            video.play();
+            mainCanvas.width = window.innerWidth;
+            mainCanvas.height = window.innerHeight;
+            state.running = true;
+            initAudio();
+            permOverlay.style.transition = 'opacity 0.6s';
+            permOverlay.style.opacity = '0';
+            setTimeout(() => permOverlay.style.display = 'none', 650);
+
+            // Init MediaPipe Hands
+            hands = new Hands({
+              locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+            hands.setOptions({
+              maxNumHands: 1,
+              modelComplexity: 1,
+              minDetectionConfidence: 0.6,
+              minTrackingConfidence: 0.5
+            });
+            hands.onResults((results) => {
+              const landmarks = results.multiHandLandmarks;
+              if (landmarks && landmarks.length > 0) {
+                const hand = landmarks[0];
+                // Use index finger MCP (landmark 9) as interaction point
+                const p = hand[9];
+                const targetX = 1 - p.x; // mirror horizontally
+                const targetY = p.y;
+                // light de-jitter, realtime response
+                state.handX += (targetX - state.handX) * 0.35;
+                state.handY += (targetY - state.handY) * 0.35;
+                state.handActive = true;
+
+                // Hand openness: avg distance from palm center (landmark 0) to fingertips (4,8,12,16,20)
+                const palm = hand[0];
+                const tips = [4, 8, 12, 16, 20];
+                let avgDist = 0;
+                for (const ti of tips) {
+                  const dx = hand[ti].x - palm.x;
+                  const dy = hand[ti].y - palm.y;
+                  avgDist += Math.sqrt(dx * dx + dy * dy);
+                }
+                avgDist /= tips.length;
+                // normalize: closed ~0.06, open ~0.22
+                const openness = Math.max(0, Math.min(1, (avgDist - 0.06) / 0.16));
+                // smooth repulse value
+                repulse += (openness - repulse) * 0.12;
+                // store openness for particle size inflation
+                state.handOpenness += (openness - state.handOpenness) * 0.15;
+
+                // Hand velocity for audio modulation
+                if (state.prevHandX > -1) {
+                  state.handVelX = state.handX - state.prevHandX;
+                  state.handVelY = state.handY - state.prevHandY;
+                }
+                state.prevHandX = state.handX;
+                state.prevHandY = state.handY;
+
+                // Update audio engine
+                updateAudio(state.handX, state.handY, openness,
+                  Math.sqrt(state.handVelX * state.handVelX + state.handVelY * state.handVelY));
+              } else {
+                state.handActive = false;
+                state.handOpenness *= 0.92;
+                fadeAudio();
+              }
+            });
+
+            const processHands = async () => {
+              if (!state.running || !hands) return;
+              await hands.send({ image: video });
+              requestAnimationFrame(processHands);
+            };
+            requestAnimationFrame(processHands);
+
+            requestAnimationFrame(draw);
+          };
+        } catch (err) {
+          errorMsg.style.display = 'block';
+          if (err.name === 'NotAllowedError') {
+            errorMsg.textContent = 'Camera access denied. Allow camera permissions and reload.';
+          } else {
+            errorMsg.textContent = 'Could not access camera: ' + err.message;
+            // Fallback: run in demo mode with mouse only
+            mainCanvas.width = window.innerWidth;
+            mainCanvas.height = window.innerHeight;
+            state.running = true;
+            permOverlay.style.transition = 'opacity 0.8s';
+            permOverlay.style.opacity = '0';
+            setTimeout(() => permOverlay.style.display = 'none', 850);
+            // Generate static particle field as demo
+            generateDemoField();
+            requestAnimationFrame(draw);
+          }
+          permBtn.textContent = 'Retry';
+          permBtn.disabled = false;
+        }
+      }
+
+      function generateDemoField() {
+        // Create a face-shaped particle field for demo purposes
+        particles.length = 0;
+        const cx = W() / 2, cy = H() / 2;
+        const rx = W() * 0.18, ry = H() * 0.28;
+        for (let i = 0; i < 18000; i++) {
+          const theta = Math.random() * Math.PI * 2;
+          const rr = Math.random();
+          // Face oval
+          const px = cx + rx * (rr * Math.cos(theta)) * (0.7 + Math.random() * 0.6);
+          const py = cy + ry * (rr * Math.sin(theta)) * (0.7 + Math.random() * 0.6);
+          const dist = Math.sqrt(Math.pow((px - cx) / rx, 2) + Math.pow((py - cy) / ry, 2));
+          const brightness = Math.max(0, 1 - dist * dist) * (0.4 + Math.random() * 0.6);
+          if (brightness < 0.04) continue;
+          const p = new Particle(px, py, brightness);
+          if (Math.random() < 0.04) p.chromatic = true;
+          particles.push(p);
+        }
+        document.getElementById('stat-particles').textContent = particles.length.toLocaleString();
+      }
+
+      // ---- Audio Engine ----
+      let audioCtx = null;
+      let oscLow, oscMid, oscHigh, lfo;
+      let gainLow, gainMid, gainHigh, gainMaster, lfoGain;
+      let filterLow, filterMid;
+      let audioStarted = false;
+
+      function initAudio() {
+        if (audioStarted) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Master gain
+        gainMaster = audioCtx.createGain();
+        gainMaster.gain.value = 0;
+        gainMaster.connect(audioCtx.destination);
+
+        // Compressor for smooth dynamics
+        const compressor = audioCtx.createDynamicsCompressor();
+        compressor.threshold.value = -24;
+        compressor.knee.value = 12;
+        compressor.ratio.value = 6;
+        compressor.connect(gainMaster);
+
+        // Reverb wet path
+        const reverbGain = audioCtx.createGain();
+        reverbGain.gain.value = 0.3;
+        reverbGain.connect(compressor);
+
+        // Dry path
+        const dryGain = audioCtx.createGain();
+        dryGain.gain.value = 0.7;
+        dryGain.connect(compressor);
+
+        // Low drone oscillator
+        oscLow = audioCtx.createOscillator();
+        oscLow.type = 'sine';
+        oscLow.frequency.value = 55;
+        gainLow = audioCtx.createGain();
+        gainLow.gain.value = 0;
+        filterLow = audioCtx.createBiquadFilter();
+        filterLow.type = 'lowpass';
+        filterLow.frequency.value = 200;
+        filterLow.Q.value = 2;
+        oscLow.connect(gainLow);
+        gainLow.connect(filterLow);
+        filterLow.connect(dryGain);
+        filterLow.connect(reverbGain);
+        oscLow.start();
+
+        // Mid harmonic oscillator
+        oscMid = audioCtx.createOscillator();
+        oscMid.type = 'triangle';
+        oscMid.frequency.value = 110;
+        gainMid = audioCtx.createGain();
+        gainMid.gain.value = 0;
+        filterMid = audioCtx.createBiquadFilter();
+        filterMid.type = 'bandpass';
+        filterMid.frequency.value = 800;
+        filterMid.Q.value = 1.5;
+        oscMid.connect(gainMid);
+        gainMid.connect(filterMid);
+        filterMid.connect(dryGain);
+        filterMid.connect(reverbGain);
+        oscMid.start();
+
+        // High shimmer oscillator
+        oscHigh = audioCtx.createOscillator();
+        oscHigh.type = 'sine';
+        oscHigh.frequency.value = 220;
+        gainHigh = audioCtx.createGain();
+        gainHigh.gain.value = 0;
+        oscHigh.connect(gainHigh);
+        gainHigh.connect(dryGain);
+        oscHigh.start();
+
+        // LFO for tremolo
+        lfo = audioCtx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.5;
+        lfoGain = audioCtx.createGain();
+        lfoGain.gain.value = 0;
+        lfo.connect(lfoGain);
+        lfoGain.connect(gainMaster.gain);
+        lfo.start();
+
+        audioStarted = true;
+      }
+
+      function updateAudio(handX, handY, openness, velocity) {
+        if (!audioStarted || !audioCtx || audioMuted) return;
+        const t = audioCtx.currentTime;
+
+        // Master volume ramps up when hand detected
+        gainMaster.gain.linearRampToValueAtTime(0.18, t + 0.08);
+
+        // Hand Y → pitch (higher hand = higher pitch)
+        const yInv = 1 - handY;
+        const basePitch = 40 + yInv * 80;
+        oscLow.frequency.linearRampToValueAtTime(basePitch, t + 0.15);
+        oscMid.frequency.linearRampToValueAtTime(basePitch * 2, t + 0.15);
+        oscHigh.frequency.linearRampToValueAtTime(basePitch * 4.02, t + 0.15);
+
+        // Hand X → filter sweep
+        const filterFreq = 100 + handX * 2400;
+        filterLow.frequency.linearRampToValueAtTime(filterFreq * 0.4, t + 0.1);
+        filterMid.frequency.linearRampToValueAtTime(filterFreq, t + 0.1);
+
+        // Openness → layer volumes
+        gainLow.gain.linearRampToValueAtTime(0.3 + openness * 0.2, t + 0.1);
+        gainMid.gain.linearRampToValueAtTime(openness * 0.25, t + 0.1);
+        gainHigh.gain.linearRampToValueAtTime(Math.pow(openness, 2) * 0.12, t + 0.1);
+
+        // Velocity → LFO rate + depth (faster hand = more tremolo)
+        const vel = Math.min(velocity * 40, 1);
+        lfo.frequency.linearRampToValueAtTime(0.3 + vel * 8, t + 0.1);
+        lfoGain.gain.linearRampToValueAtTime(vel * 0.06, t + 0.1);
+      }
+
+      function fadeAudio() {
+        if (!audioStarted || !audioCtx) return;
+        const t = audioCtx.currentTime;
+        gainMaster.gain.linearRampToValueAtTime(0, t + 0.8);
+      }
+
+      // Mute button handler
+      document.getElementById('btn-mute').addEventListener('click', function () {
+        audioMuted = !audioMuted;
+        this.textContent = audioMuted ? '♪ Off' : '♪ On';
+        this.classList.toggle('active', !audioMuted);
+        if (audioMuted && audioStarted && audioCtx) {
+          gainMaster.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+        }
+      });
+
+      // Auto-start hint
+      permBtn.focus();
+      window.addEventListener('resize', () => {
+        mainCanvas.width = window.innerWidth;
+        mainCanvas.height = window.innerHeight;
+      });
+    })();
+  </script>
+</body>
+
+</html>
