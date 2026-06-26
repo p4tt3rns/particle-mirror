@@ -545,8 +545,24 @@
         : Math.min(120000, Math.max(100000, Math.round(screenArea * 0.04)));
       const particles = [];
 
-      const SAMPLE_W = 160;
-      const SAMPLE_H = 120;
+      // Desktop uses dynamic high-res dimensions, Mobile uses yesterday's 160x120 stretched dimensions
+      let SAMPLE_W = 160;
+      let SAMPLE_H = 120;
+      const TARGET_SAMPLE_AREA = 50000;
+
+      function computeSampleDimensions() {
+        if (isMobile) {
+          SAMPLE_W = 160;
+          SAMPLE_H = 120;
+        } else {
+          const ar = (window.innerWidth || 390) / (window.innerHeight || 844);
+          const sh = Math.round(Math.sqrt(TARGET_SAMPLE_AREA / ar));
+          const sw = Math.round(sh * ar);
+          SAMPLE_W = Math.max(60, sw);
+          SAMPLE_H = Math.max(60, sh);
+        }
+      }
+      computeSampleDimensions();
 
       // Recalculate on resize and orientation change
       function handleResize() {
@@ -554,6 +570,7 @@
         MAX_P = isMobile
           ? Math.min(12000, Math.max(6000, Math.round(area * 0.025)))
           : Math.min(120000, Math.max(100000, Math.round(area * 0.04)));
+        computeSampleDimensions();
         mainCanvas.width = window.innerWidth;
         mainCanvas.height = window.innerHeight;
       }
@@ -590,7 +607,27 @@
       function sampleFrame() {
         pixCtx.save();
         pixCtx.scale(-1, 1); // mirror
-        pixCtx.drawImage(video, -SAMPLE_W, 0, SAMPLE_W, SAMPLE_H);
+        
+        if (isMobile) {
+          // Mobile: simple robust stretching to cover the whole screen and prevent rotation/cropping bugs
+          pixCtx.drawImage(video, -SAMPLE_W, 0, SAMPLE_W, SAMPLE_H);
+        } else {
+          // Desktop: premium high-resolution cover cropping
+          const videoW = video.videoWidth || 640;
+          const videoH = video.videoHeight || 480;
+          const screenAR = W() / H();
+          const videoAR = videoW / videoH;
+          let sx = 0, sy = 0, sw = videoW, sh = videoH;
+          if (videoAR > screenAR) {
+            sw = videoH * screenAR;
+            sx = (videoW - sw) / 2;
+          } else {
+            sh = videoW / screenAR;
+            sy = (videoH - sh) / 2;
+          }
+          pixCtx.drawImage(video, sx, sy, sw, sh, -SAMPLE_W, 0, SAMPLE_W, SAMPLE_H);
+        }
+        
         pixCtx.restore();
         return pixCtx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
       }
@@ -670,7 +707,7 @@
         }
 
         // Rebuild particles from video at intervals
-        if (state.running && video.readyState >= 2 && video.videoWidth > 0 && ts - lastRebuild > REBUILD_INTERVAL) {
+        if (state.running && video.readyState >= 2 && (isMobile || video.videoWidth > 0) && ts - lastRebuild > REBUILD_INTERVAL) {
           pixelCanvas.width = SAMPLE_W;
           pixelCanvas.height = SAMPLE_H;
           const imageData = sampleFrame();
