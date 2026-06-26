@@ -382,6 +382,11 @@
     /* Mobile optimizations */
     @media (max-width: 768px) {
       .sliders {
+        bottom: 80px !important;
+        width: calc(100% - 40px);
+        left: 20px !important;
+      }
+      .sliders .slider-row:not(:last-child) {
         display: none !important;
       }
 
@@ -717,7 +722,7 @@
         ctx.fillRect(0, 0, W(), H());
 
         // Build array of repulsion points (fingertips or mouse fallback)
-        const repulseR = 60;  // reduced radius for smaller circles around fingertips
+        const repulseR = 30;  // reduced radius for smaller circles around fingertips
         const repPoints = [];
 
         if (state.handActive && state.fingertips.length > 0) {
@@ -869,14 +874,14 @@
 
         // Update P4TT3RNS hand logo position/scale
         const handLogo = document.getElementById('hand-logo');
-        if (state.handActive && ix > -900) {
+        if (state.handActive && state.palmX !== undefined) {
           // Larger logo as requested
           const logoScale = 120 / 937;
           const logoOpacity = 0.5 + handOpen * 0.5;
           handLogo.style.visibility = 'visible';
           handLogo.style.opacity = logoOpacity;
-          handLogo.style.left = ix + 'px';
-          handLogo.style.top = iy + 'px';
+          handLogo.style.left = (state.palmX * W()) + 'px';
+          handLogo.style.top = (state.palmY * H()) + 'px';
           handLogo.style.transform = `translate(-50%, -50%) scale(${logoScale})`;
         } else {
           handLogo.style.opacity = '0';
@@ -1040,6 +1045,8 @@
 
                 // Hand openness: avg distance from palm center (landmark 0) to fingertips (4,8,12,16,20)
                 const palm = hand[0];
+                state.palmX = 1 - palm.x;
+                state.palmY = palm.y;
                 const tips = [4, 8, 12, 16, 20];
                 let avgDist = 0;
                 for (const ti of tips) {
