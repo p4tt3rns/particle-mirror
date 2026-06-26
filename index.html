@@ -846,7 +846,7 @@
           ctx.strokeStyle = '#fff';
           ctx.lineWidth = 0.8;
           ctx.beginPath();
-          ctx.arc(cx, cy, repulseR, 0, Math.PI * 2);
+          ctx.arc(cx, cy, repulseR * 0.4, 0, Math.PI * 2);
           ctx.stroke();
           // inner dot
           ctx.globalAlpha = 0.5;
@@ -1143,11 +1143,13 @@
         grainDelay = new Tone.FeedbackDelay("8n", 0.4).connect(masterComp);
         grainPanner = new Tone.Panner(0).connect(grainDelay);
 
-        // Breathing drone (Always on)
+        // Breathing drone (Always on) - Removed at user request to silence continuous LFO texture
+        /*
         droneVol = new Tone.Volume(-12).connect(pannerX);
         droneFilter = new Tone.Filter(200, "lowpass").connect(droneVol);
         droneOsc = new Tone.Oscillator(55, "sine").connect(droneFilter).start();
         droneLfo = new Tone.LFO(0.1, 100, 400).connect(droneFilter.frequency).start();
+        */
 
         // Setup grains
         for (let i = 0; i < 6; i++) {
@@ -1187,8 +1189,10 @@
           const chorus = new Tone.Chorus(4, 2.5, 0.5).connect(pannerX).start();
           const pad = new Tone.Synth({ oscillator: { type: "sawtooth" } }).connect(chorus);
           currentModeNodes.push(chorus, pad);
-          droneOsc.type = "sine";
-          droneOsc.detune.value = 0;
+          if (droneOsc) {
+            droneOsc.type = "sine";
+            droneOsc.detune.value = 0;
+          }
           masterReverb.decay = 4;
         } else if (newMode === 'ghost') {
           const delay = new Tone.FeedbackDelay("4n", 0.6).connect(pannerX);
@@ -1199,24 +1203,30 @@
           const eerieSub = new Tone.Oscillator(55, "pwm").connect(tremolo).start();
           eerieSub.volume.value = -15;
           currentModeNodes.push(delay, filter, eerieNoise, tremolo, eerieSub);
-          droneOsc.type = "sine";
-          droneOsc.detune.value = 50; // Subtle dissonance
+          if (droneOsc) {
+            droneOsc.type = "sine";
+            droneOsc.detune.value = 50; // Subtle dissonance
+          }
           masterReverb.decay = 10;
         } else if (newMode === 'chrome') {
           const cheby = new Tone.Chebyshev(50).connect(pannerX);
           const fm = new Tone.FMOscillator("C2", "square", "square").connect(cheby).start();
           fm.volume.value = -15;
           currentModeNodes.push(cheby, fm);
-          droneOsc.type = "square";
-          droneOsc.detune.value = 0;
+          if (droneOsc) {
+            droneOsc.type = "square";
+            droneOsc.detune.value = 0;
+          }
           masterReverb.decay = 3;
         } else if (newMode === 'burst') {
           const dist = new Tone.Distortion(0.8).connect(pannerX);
           const rumble = new Tone.Noise("brown").connect(dist).start();
           rumble.volume.value = -10;
           currentModeNodes.push(dist, rumble);
-          droneOsc.type = "sawtooth";
-          droneOsc.detune.value = 0;
+          if (droneOsc) {
+            droneOsc.type = "sawtooth";
+            droneOsc.detune.value = 0;
+          }
           masterReverb.decay = 2;
         }
       }
@@ -1230,11 +1240,15 @@
           
           const yInv = 1 - (handY || 0.5);
           const basePitch = 40 + yInv * 80;
-          droneOsc.frequency.rampTo(basePitch, 0.1);
+          if (droneOsc) {
+            droneOsc.frequency.rampTo(basePitch, 0.1);
+          }
 
           masterFilter.frequency.rampTo(300 + (openness || 0) * 15000, 0.1);
 
-          droneVol.volume.rampTo(-12 + (openness || 0) * 10, 0.1);
+          if (droneVol) {
+            droneVol.volume.rampTo(-12 + (openness || 0) * 10, 0.1);
+          }
           masterVol.volume.rampTo(-6, 0.1);
         } catch (e) {
           console.error("updateAudio error:", e);
