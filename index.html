@@ -1193,11 +1193,6 @@
           }
           masterReverb.decay = 4;
         } else if (newMode === 'ghost') {
-          const delay = new Tone.FeedbackDelay("4n", 0.6).connect(pannerX);
-          const tremolo = new Tone.Tremolo(4, 0.75).connect(delay).start();
-          const eerieSub = new Tone.Oscillator(55, "pwm").connect(tremolo).start();
-          eerieSub.volume.value = -15;
-          currentModeNodes.push(delay, tremolo, eerieSub);
           if (droneOsc) {
             droneOsc.type = "sine";
             droneOsc.detune.value = 50; // Subtle dissonance
