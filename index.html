@@ -727,8 +727,8 @@
         ctx.fillRect(0, 0, W(), H());
 
         // Build array of repulsion points (fingertips or mouse fallback)
-        const repulseR = 40 + repulse * 130;
-        const repulseStr = 0.3 + repulse * 2.4;
+        const repulseR = 18 + repulse * 40;  // tight per-finger radius for carving traces
+        const repulseStr = 1.5 + repulse * 4;
         const repPoints = [];
 
         if (state.handActive && state.fingertips.length > 0) {
@@ -779,11 +779,11 @@
           }
 
           // Damping
-          p.vx = (p.vx + fx + nx * 0.06) * 0.92;
-          p.vy = (p.vy + fy + ny * 0.06) * 0.92;
+          p.vx = (p.vx + fx + nx * 0.04) * 0.88;
+          p.vy = (p.vy + fy + ny * 0.04) * 0.88;
 
-          // Slow, gentle spring-back to origin
-          const springK = mode === 'burst' ? 0.003 : 0.008;
+          // Very slow spring-back to origin — particles drift back gently leaving a lingering black trace
+          const springK = mode === 'burst' ? 0.001 : 0.003;
           p.vx += (p.ox - p.x) * springK;
           p.vy += (p.oy - p.y) * springK;
 
@@ -868,7 +868,7 @@
           ctx.strokeStyle = '#fff';
           ctx.lineWidth = 0.8;
           ctx.beginPath();
-          ctx.arc(cx, cy, repulseR, 0, Math.PI * 2);
+          ctx.arc(cx, cy, 20, 0, Math.PI * 2);
           ctx.stroke();
           // inner dot
           ctx.globalAlpha = 0.5;
@@ -882,8 +882,8 @@
         // Update P4TT3RNS hand logo position/scale
         const handLogo = document.getElementById('hand-logo');
         if (state.handActive && ix > -900) {
-          // Scale the logo dynamically to fit perfectly inside the hand circle (about 70% of the circle's diameter)
-          const logoScale = (1.4 * repulseR) / 937;
+          // Scale the logo to fit inside the small visual circle
+          const logoScale = 40 / 937;
           const logoOpacity = 0.5 + handOpen * 0.5;
           handLogo.style.visibility = 'visible';
           handLogo.style.opacity = logoOpacity;
