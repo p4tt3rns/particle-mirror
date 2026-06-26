@@ -383,7 +383,7 @@
     @media (max-width: 768px) {
       .sliders {
         top: auto !important;
-        bottom: 80px !important;
+        bottom: 110px !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
         width: auto !important;
@@ -399,6 +399,15 @@
       }
       .sliders .slider-row:not(:last-child) {
         display: none !important;
+      }
+      
+      input[type="range"] {
+        width: 160px !important;
+        height: 2px !important;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        width: 20px !important;
+        height: 20px !important;
       }
 
       .bottombar .controls [data-mode] {
