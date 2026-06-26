@@ -741,28 +741,24 @@
         }
         ctx.fillRect(0, 0, W(), H());
 
-        // Build array of repulsion points (fingertips or mouse fallback)
-        const repulseR = 30;  // reduced radius for smaller circles around fingertips
+        // Hand openness drives particle size inflation in range
+        const handOpen = state.handOpenness;
+
+        // Build array of repulsion points (single sphere for palm or mouse fallback)
+        const repulseR = 40 + handOpen * 200;  // dynamic radius based on openness
         const repPoints = [];
 
-        if (state.handActive && state.fingertips.length > 0) {
-          for (const ft of state.fingertips) {
-            repPoints.push({ x: ft.x * W(), y: ft.y * H() });
-          }
+        if (state.handActive && state.palmX !== undefined) {
+          repPoints.push({ x: state.palmX * W(), y: state.palmY * H() });
         } else if (state.mouseX >= 0) {
           repPoints.push({ x: state.mouseX, y: state.mouseY });
         }
 
-        // Hand openness drives particle size inflation in range
-        const handOpen = state.handOpenness;
-
-        // Use center of fingertips for logo/circle position
+        // Use center of repulsion for logo/circle position
         let ix = -999, iy = -999;
         if (repPoints.length > 0) {
-          ix = 0; iy = 0;
-          for (const rp of repPoints) { ix += rp.x; iy += rp.y; }
-          ix /= repPoints.length;
-          iy /= repPoints.length;
+          ix = repPoints[0].x;
+          iy = repPoints[0].y;
         }
 
         // Update + draw particles
@@ -880,8 +876,9 @@
           ctx.globalAlpha = 0.18;
           ctx.strokeStyle = '#fff';
           ctx.lineWidth = 0.8;
+          const visualR = 10 + handOpen * 40;
           ctx.beginPath();
-          ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+          ctx.arc(cx, cy, visualR, 0, Math.PI * 2);
           ctx.stroke();
           // inner dot
           ctx.globalAlpha = 0.5;
@@ -895,8 +892,9 @@
         // Update P4TT3RNS hand logo position/scale
         const handLogo = document.getElementById('hand-logo');
         if (state.handActive && state.palmX !== undefined) {
-          // Larger logo as requested
-          const logoScale = 120 / 937;
+          // Logo size changes based on handOpen
+          const baseScale = 90 / 937;
+          const logoScale = baseScale + handOpen * (120 / 937);
           const logoOpacity = 0.5 + handOpen * 0.5;
           handLogo.style.visibility = 'visible';
           handLogo.style.opacity = logoOpacity;
