@@ -360,7 +360,8 @@
       pointer-events: none;
       z-index: 6;
       opacity: 0;
-      transition: opacity 0.3s ease;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
       transform-origin: center center;
       will-change: transform, opacity;
       filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.3)) drop-shadow(0 0 4px rgba(255, 255, 255, 0.6));
@@ -458,7 +459,7 @@
     <div class="topbar-right" id="topbar-stats">
       <span class="live-dot"></span>LIVE<br>
       <span id="stat-particles">0</span> particles<br>
-      <span id="stat-mode">portrait</span>
+      <span id="stat-mode">ghost</span>
     </div>
   </div>
 
@@ -484,8 +485,8 @@
 
   <div class="bottombar">
     <div class="controls">
-      <button class="ctrl-btn active" id="btn-portrait" data-mode="portrait">Portrait</button>
-      <button class="ctrl-btn" id="btn-ghost" data-mode="ghost">Ghost</button>
+      <button class="ctrl-btn" id="btn-portrait" data-mode="portrait">Portrait</button>
+      <button class="ctrl-btn active" id="btn-ghost" data-mode="ghost">Ghost</button>
       <button class="ctrl-btn" id="btn-chrome" data-mode="chrome">Chrome</button>
       <button class="ctrl-btn" id="btn-burst" data-mode="burst">Burst</button>
       <button class="ctrl-btn active" id="btn-mute" style="margin-left:12px;border-color:rgba(255,255,255,0.22)">♪
@@ -512,7 +513,7 @@
       const W = () => mainCanvas.width;
       const H = () => mainCanvas.height;
 
-      let mode = 'portrait';
+      let mode = 'ghost';
       let density = 1.00, scatter = 0.00, repulse = 0.55, threshold = 0.30;
       let audioMuted = false;
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (window.innerWidth <= 768 && 'ontouchstart' in window);
@@ -855,12 +856,14 @@
             ? 0.08 + handOpen * 0.10  // Mobile: ~75-169px wide, readable at arm's length
             : 0.15 + handOpen * 0.40;
           const logoOpacity = 0.5 + handOpen * 0.5;
+          handLogo.style.visibility = 'visible';
           handLogo.style.opacity = logoOpacity;
           handLogo.style.left = ix + 'px';
           handLogo.style.top = iy + 'px';
           handLogo.style.transform = `translate(-50%, -50%) scale(${logoScale})`;
         } else {
           handLogo.style.opacity = '0';
+          handLogo.style.visibility = 'hidden';
         }
 
         // Mode-specific overlays
