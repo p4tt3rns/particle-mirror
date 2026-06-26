@@ -478,7 +478,7 @@
     </div>
     <div class="slider-row">
       <span class="slider-label">Threshold</span>
-      <input id="s-thresh" type="range" min="0" max="100" value="65">
+      <input id="s-thresh" type="range" min="0" max="100" value="30">
     </div>
   </div>
 
@@ -513,7 +513,7 @@
       const H = () => mainCanvas.height;
 
       let mode = 'portrait';
-      let density = 1.00, scatter = 0.00, repulse = 0.55, threshold = 0.65;
+      let density = 1.00, scatter = 0.00, repulse = 0.55, threshold = 0.30;
       let audioMuted = false;
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (window.innerWidth <= 768 && 'ontouchstart' in window);
 
@@ -542,47 +542,54 @@
       // ---- Particle system ----
       const screenArea = window.innerWidth * window.innerHeight;
       let MAX_P = isMobile
-        ? Math.min(35000, Math.max(15000, Math.round(screenArea * 0.05)))
+        ? Math.min(55000, Math.max(25000, Math.round(screenArea * 0.08)))
         : Math.min(120000, Math.max(100000, Math.round(screenArea * 0.04)));
       const particles = [];
 
       // Compute sample grid dimensions matching screen aspect ratio
-      // Keeps total sample area ~19200 pixels for consistent density
+      // ~50k sample area gives high-res face recognition on all screens
+      const TARGET_SAMPLE_AREA = 50000;
       function computeSampleDimensions() {
         const ar = (window.innerWidth || 390) / (window.innerHeight || 844);
-        const sh = Math.round(Math.sqrt(19200 / ar));
+        const sh = Math.round(Math.sqrt(TARGET_SAMPLE_AREA / ar));
         const sw = Math.round(sh * ar);
-        return { w: Math.max(40, sw), h: Math.max(40, sh) };
+        return { w: Math.max(60, sw), h: Math.max(60, sh) };
       }
       let sampleDims = computeSampleDimensions();
       let SAMPLE_W = sampleDims.w;
       let SAMPLE_H = sampleDims.h;
 
-      // Recalculate on resize
-      window.addEventListener('resize', () => {
+      // Recalculate on resize and orientation change
+      function handleResize() {
         const area = window.innerWidth * window.innerHeight;
         MAX_P = isMobile
-          ? Math.min(35000, Math.max(15000, Math.round(area * 0.05)))
+          ? Math.min(55000, Math.max(25000, Math.round(area * 0.08)))
           : Math.min(120000, Math.max(100000, Math.round(area * 0.04)));
         const dims = computeSampleDimensions();
         SAMPLE_W = dims.w;
         SAMPLE_H = dims.h;
+        mainCanvas.width = window.innerWidth;
+        mainCanvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('orientationchange', () => {
+        setTimeout(handleResize, 250); // delay for iOS orientation to settle
       });
 
       function Particle(x, y, brightness) {
         this.ox = x; this.oy = y;
-        this.x = x + (Math.random() - 0.5) * 8;
-        this.y = y + (Math.random() - 0.5) * 8;
+        this.x = x + (Math.random() - 0.5) * 4;
+        this.y = y + (Math.random() - 0.5) * 4;
         this.vx = 0; this.vy = 0;
         this.brightness = brightness;
         this.size = isMobile
-          ? 0.18 + brightness * 0.42 + Math.random() * 0.18
-          : 0.32 + brightness * 0.9 + Math.random() * 0.35;
-        this.alpha = 0.3 + brightness * 0.7;
-        this.chromatic = Math.random() < 0.03; // 3% chrome particles
+          ? 0.3 + brightness * 0.5 + Math.random() * 0.2
+          : 0.4 + brightness * 0.75 + Math.random() * 0.3;
+        this.alpha = 0.5 + brightness * 0.5;
+        this.chromatic = Math.random() < 0.03;
         this.noiseOff = Math.random() * 1000;
         this.life = 1;
-        this.touch = 0; // how recently this particle was affected by the hand
+        this.touch = 0;
       }
 
       // Simple Perlin-ish noise (value noise)
@@ -676,7 +683,7 @@
 
       let frameCount = 0;
       let lastRebuild = 0;
-      const REBUILD_INTERVAL = 80; // ms between full particle rebuild from video
+      const REBUILD_INTERVAL = isMobile ? 120 : 80; // ms between full particle rebuild from video
 
       function draw(ts) {
         if (!state.running) return;
@@ -702,11 +709,11 @@
           lastRebuild = ts;
         }
 
-        // Clear
+        // Clear — softer fade for flowing particle trails
         if (mode === 'ghost') {
-          ctx.fillStyle = 'rgba(0,0,0,0.55)';
+          ctx.fillStyle = 'rgba(0,0,0,0.35)';
         } else {
-          ctx.fillStyle = 'rgba(0,0,0,0.82)';
+          ctx.fillStyle = 'rgba(0,0,0,0.68)';
         }
         ctx.fillRect(0, 0, W(), H());
 
@@ -725,30 +732,30 @@
         for (let i = 0; i < particles.length; i++) {
           const p = particles[i];
 
-          // Noise drift (slowed down significantly)
-          const nx = noise(p.ox * 0.008, p.oy * 0.008, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.15);
-          const ny = noise(p.ox * 0.008 + 100, p.oy * 0.008 + 100, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.15);
+          // Subtle noise drift for organic movement
+          const nx = noise(p.ox * 0.008, p.oy * 0.008, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.08);
+          const ny = noise(p.ox * 0.008 + 100, p.oy * 0.008 + 100, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.08);
 
-          // Repulsion from hand/mouse
+          // Repulsion from hand/mouse — liquid push
           let fx = 0, fy = 0;
           if (ix > -900) {
             const dx = p.x - ix;
             const dy = p.y - iy;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < repulseR && dist > 0.5) {
-              const force = Math.pow(1 - dist / repulseR, 1.8) * repulseStr;
-              fx = (dx / dist) * force * 4;
-              fy = (dy / dist) * force * 4;
+              const force = Math.pow(1 - dist / repulseR, 1.6) * repulseStr;
+              fx = (dx / dist) * force * 5;
+              fy = (dy / dist) * force * 5;
               p.touch = 1;
               if (typeof triggerGrain === 'function') triggerGrain(p);
             }
           }
 
-          p.vx = (p.vx + fx + nx * 0.1) * 0.86;
-          p.vy = (p.vy + fy + ny * 0.1) * 0.86;
+          p.vx = (p.vx + fx + nx * 0.08) * 0.92;
+          p.vy = (p.vy + fy + ny * 0.08) * 0.92;
 
-          // Return to origin
-          const returnStr = mode === 'burst' ? 0.006 : 0.014;
+          // Gentle return to origin — liquid flow
+          const returnStr = mode === 'burst' ? 0.003 : 0.005;
           p.vx += (p.ox - p.x) * returnStr;
           p.vy += (p.oy - p.y) * returnStr;
 
@@ -756,7 +763,7 @@
           p.y += p.vy;
 
           // touch decay for trail effect
-          p.touch *= 0.9;
+          p.touch *= 0.95;
 
           // Draw
           const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
@@ -947,7 +954,7 @@
           }
         }
         // Initialize audio within user gesture context (critical for iOS)
-        initAudio();
+        await initAudio();
 
         permBtn.textContent = 'Initialising…';
         permBtn.disabled = true;
@@ -1098,14 +1105,15 @@
 
       async function initAudio() {
         if (audioStarted) return;
-        await Tone.start();
+        // Tone.start() already called in startCamera — avoid extra await to stay in gesture context
         
-        masterVol = new Tone.Volume(-Infinity).toDestination();
+        // Start at audible level (not -Infinity) so iOS hears audio immediately
+        masterVol = new Tone.Volume(-12).toDestination();
         masterFilter = new Tone.Filter(15000, "lowpass").connect(masterVol);
         masterComp = new Tone.Compressor({ threshold: -24, ratio: 6, knee: 12 }).connect(masterFilter);
         masterReverb = new Tone.Reverb({ decay: 4 }).connect(masterComp);
         masterReverb.wet.value = 0.4;
-        await masterReverb.ready;
+        // Don't await reverb.ready — keeps execution in user gesture context on iOS
         
         pannerX = new Tone.Panner(0).connect(masterReverb);
         
@@ -1249,7 +1257,7 @@
 
       function fadeAudio() {
         if (!audioStarted || !masterVol) return;
-        masterVol.volume.rampTo(-Infinity, 0.8);
+        masterVol.volume.rampTo(-18, 1.5); // Quiet ambient, not fully silent
       }
 
       // Mute button handler
@@ -1266,10 +1274,7 @@
 
       // Auto-start hint
       permBtn.focus();
-      window.addEventListener('resize', () => {
-        mainCanvas.width = window.innerWidth;
-        mainCanvas.height = window.innerHeight;
-      });
+
     })();
   </script>
 </body>
