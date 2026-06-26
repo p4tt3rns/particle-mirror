@@ -726,7 +726,7 @@
         // Get interaction point
         const ix = state.handActive ? state.handX * W() : -999;
         const iy = state.handActive ? state.handY * H() : -999;
-        const repulseR = 80 + repulse * 260;
+        const repulseR = 40 + repulse * 130;
         const repulseStr = 0.3 + repulse * 2.4;
 
         // Hand openness drives particle size inflation in range
@@ -846,7 +846,7 @@
           ctx.strokeStyle = '#fff';
           ctx.lineWidth = 0.8;
           ctx.beginPath();
-          ctx.arc(cx, cy, repulseR * 0.4, 0, Math.PI * 2);
+          ctx.arc(cx, cy, repulseR, 0, Math.PI * 2);
           ctx.stroke();
           // inner dot
           ctx.globalAlpha = 0.5;
@@ -1143,13 +1143,11 @@
         grainDelay = new Tone.FeedbackDelay("8n", 0.4).connect(masterComp);
         grainPanner = new Tone.Panner(0).connect(grainDelay);
 
-        // Breathing drone (Always on) - Removed at user request to silence continuous LFO texture
-        /*
+        // Breathing drone (Always on)
         droneVol = new Tone.Volume(-12).connect(pannerX);
         droneFilter = new Tone.Filter(200, "lowpass").connect(droneVol);
         droneOsc = new Tone.Oscillator(55, "sine").connect(droneFilter).start();
         droneLfo = new Tone.LFO(0.1, 100, 400).connect(droneFilter.frequency).start();
-        */
 
         // Setup grains
         for (let i = 0; i < 6; i++) {
@@ -1199,10 +1197,8 @@
           const filter = new Tone.AutoFilter("4n", 200, 4).connect(delay).start();
           const eerieNoise = new Tone.Noise("brown").connect(filter).start();
           eerieNoise.volume.value = -18;
-          const tremolo = new Tone.Tremolo(4, 0.75).connect(delay).start();
-          const eerieSub = new Tone.Oscillator(55, "pwm").connect(tremolo).start();
-          eerieSub.volume.value = -15;
-          currentModeNodes.push(delay, filter, eerieNoise, tremolo, eerieSub);
+          // Removed tremolo and eerieSub to silence the throbbing "woaowoaowoao" sub-bass texture
+          currentModeNodes.push(delay, filter, eerieNoise);
           if (droneOsc) {
             droneOsc.type = "sine";
             droneOsc.detune.value = 50; // Subtle dissonance
