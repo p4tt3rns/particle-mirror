@@ -860,10 +860,8 @@
         // Update P4TT3RNS hand logo position/scale
         const handLogo = document.getElementById('hand-logo');
         if (state.handActive && ix > -900) {
-          // Since the text element is naturally 937px wide, we scale it down to fit the hand nicely.
-          const logoScale = isMobile
-            ? 0.08 + handOpen * 0.10  // Mobile: ~75-169px wide, readable at arm's length
-            : 0.15 + handOpen * 0.40;
+          // Scale the logo dynamically to fit perfectly inside the hand circle (about 70% of the circle's diameter)
+          const logoScale = (1.4 * repulseR) / 937;
           const logoOpacity = 0.5 + handOpen * 0.5;
           handLogo.style.visibility = 'visible';
           handLogo.style.opacity = logoOpacity;
@@ -1193,6 +1191,11 @@
           }
           masterReverb.decay = 4;
         } else if (newMode === 'ghost') {
+          const delay = new Tone.FeedbackDelay("4n", 0.6).connect(pannerX);
+          const tremolo = new Tone.Tremolo(4, 0.75).connect(delay).start();
+          const eerieSub = new Tone.Oscillator(55, "pwm").connect(tremolo).start();
+          eerieSub.volume.value = -15;
+          currentModeNodes.push(delay, tremolo, eerieSub);
           if (droneOsc) {
             droneOsc.type = "sine";
             droneOsc.detune.value = 50; // Subtle dissonance
