@@ -543,7 +543,7 @@
       // ---- Particle system ----
       const screenArea = window.innerWidth * window.innerHeight;
       let MAX_P = isMobile
-        ? Math.min(55000, Math.max(25000, Math.round(screenArea * 0.08)))
+        ? Math.min(12000, Math.max(6000, Math.round(screenArea * 0.025)))
         : Math.min(120000, Math.max(100000, Math.round(screenArea * 0.04)));
       const particles = [];
 
@@ -684,7 +684,7 @@
 
       let frameCount = 0;
       let lastRebuild = 0;
-      const REBUILD_INTERVAL = isMobile ? 120 : 80; // ms between full particle rebuild from video
+      const REBUILD_INTERVAL = isMobile ? 150 : 80; // ms between full particle rebuild from video
 
       function draw(ts) {
         if (!state.running) return;
@@ -819,11 +819,15 @@
             const lum = Math.round(p.brightness * 255);
             const a = Math.min(1, p.alpha + speedBoost);
             const baseR = p.size * (1 + speedBoost * 0.5 + p.touch * 0.9) * sizeInflation;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, baseR, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(${lum},${lum},${lum},${a})`;
             ctx.globalAlpha = 1;
-            ctx.fill();
+            if (isMobile) {
+              ctx.fillRect(p.x - baseR, p.y - baseR, baseR * 2, baseR * 2);
+            } else {
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, baseR, 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
         }
 
@@ -964,8 +968,8 @@
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
-              width: { ideal: isMobile ? 480 : 640 },
-              height: { ideal: isMobile ? 640 : 480 },
+              width: { ideal: 640 },
+              height: { ideal: 480 },
               facingMode: 'user'
             },
             audio: false
@@ -1277,6 +1281,20 @@
 
       // Auto-start hint
       permBtn.focus();
+
+      // iOS Audio Context activation fallback
+      const resumeAudio = async () => {
+        if (typeof Tone !== 'undefined' && Tone.context) {
+          if (Tone.context.state !== 'running') {
+            await Tone.start();
+            await Tone.context.resume();
+          }
+        }
+        document.body.removeEventListener('touchstart', resumeAudio);
+        document.body.removeEventListener('click', resumeAudio);
+      };
+      document.body.addEventListener('touchstart', resumeAudio, { passive: true });
+      document.body.addEventListener('click', resumeAudio, { passive: true });
 
     })();
   </script>
