@@ -584,8 +584,8 @@
 
       function Particle(x, y, brightness) {
         this.ox = x; this.oy = y;
-        this.x = x + (Math.random() - 0.5) * 4;
-        this.y = y + (Math.random() - 0.5) * 4;
+        this.x = x;
+        this.y = y;
         this.vx = 0; this.vy = 0;
         this.brightness = brightness;
         this.size = isMobile
@@ -596,6 +596,7 @@
         this.noiseOff = Math.random() * 1000;
         this.life = 1;
         this.touch = 0;
+        this.density = Math.random() * 40 + 5;
       }
 
       // Simple Perlin-ish noise (value noise)
@@ -657,11 +658,9 @@
             const count = mode === 'burst' ? 1 : (brightness > 0.7 ? 2 : 1);
             for (let c = 0; c < count; c++) {
               if (particles.length >= MAX_P) break;
-              const sx = scatterPx * (Math.random() - 0.5);
-              const sy = scatterPx * (Math.random() - 0.5);
               const p = new Particle(
-                px * scaleX + sx,
-                py * scaleY + sy,
+                px * scaleX,
+                py * scaleY,
                 brightness
               );
               if (mode === 'ghost') {
@@ -727,8 +726,7 @@
         ctx.fillRect(0, 0, W(), H());
 
         // Build array of repulsion points (fingertips or mouse fallback)
-        const repulseR = 18 + repulse * 40;  // tight per-finger radius for carving traces
-        const repulseStr = 1.5 + repulse * 4;
+        const repulseR = 120;  // large radius for the whole hover effect
         const repPoints = [];
 
         if (state.handActive && state.fingertips.length > 0) {
@@ -757,38 +755,37 @@
         for (let i = 0; i < particles.length; i++) {
           const p = particles[i];
 
-          // Subtle noise drift for organic movement
-          const nx = noise(p.ox * 0.008, p.oy * 0.008, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.08);
-          const ny = noise(p.ox * 0.008 + 100, p.oy * 0.008 + 100, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.08);
-
-          // Repulsion from each fingertip / mouse point
-          let fx = 0, fy = 0;
+          // exact hover effect from reference
+          let isRepulsed = false;
           for (let rpi = 0; rpi < repPoints.length; rpi++) {
             const rp = repPoints[rpi];
             const dx = p.x - rp.x;
             const dy = p.y - rp.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < repulseR && dist > 0.5) {
-              const proximity = 1 - dist / repulseR;
-              const repForce = Math.pow(proximity, 1.6) * repulseStr * 6;
-              fx += (dx / dist) * repForce;
-              fy += (dy / dist) * repForce;
+            const distSquared = dx * dx + dy * dy;
+            const radiusSquared = repulseR * repulseR;
+
+            if (distSquared < radiusSquared) {
+              const distance = Math.sqrt(distSquared) || 0.0001;
+              const forceDirectionX = dx / distance;
+              const forceDirectionY = dy / distance;
+              const force = (repulseR - distance) / repulseR;
+              
+              p.x += forceDirectionX * force * p.density;
+              p.y += forceDirectionY * force * p.density;
+              
               p.touch = 1;
+              isRepulsed = true;
               if (typeof triggerGrain === 'function') triggerGrain(p);
             }
           }
 
-          // Damping
-          p.vx = (p.vx + fx + nx * 0.04) * 0.88;
-          p.vy = (p.vy + fy + ny * 0.04) * 0.88;
-
-          // Very slow spring-back to origin — particles drift back gently leaving a lingering black trace
-          const springK = mode === 'burst' ? 0.001 : 0.003;
-          p.vx += (p.ox - p.x) * springK;
-          p.vy += (p.oy - p.y) * springK;
-
-          p.x += p.vx;
-          p.y += p.vy;
+          if (!isRepulsed) {
+             const backDx = p.ox - p.x;
+             const backDy = p.oy - p.y;
+             // Very slow return speed
+             p.x += backDx * 0.02;
+             p.y += backDy * 0.02;
+          }
 
           // touch decay for trail effect
           p.touch *= 0.95;
@@ -868,7 +865,7 @@
           ctx.strokeStyle = '#fff';
           ctx.lineWidth = 0.8;
           ctx.beginPath();
-          ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+          ctx.arc(cx, cy, 10, 0, Math.PI * 2);
           ctx.stroke();
           // inner dot
           ctx.globalAlpha = 0.5;
@@ -882,8 +879,8 @@
         // Update P4TT3RNS hand logo position/scale
         const handLogo = document.getElementById('hand-logo');
         if (state.handActive && ix > -900) {
-          // Scale the logo to fit inside the small visual circle
-          const logoScale = 40 / 937;
+          // Larger logo as requested
+          const logoScale = 120 / 937;
           const logoOpacity = 0.5 + handOpen * 0.5;
           handLogo.style.visibility = 'visible';
           handLogo.style.opacity = logoOpacity;
