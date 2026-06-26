@@ -39,8 +39,6 @@
       position: fixed;
       top: -9999px;
       left: -9999px;
-      width: 320px;
-      height: 240px;
       opacity: 0;
       pointer-events: none;
     }
@@ -702,7 +700,7 @@
         }
 
         // Rebuild particles from video at intervals
-        if (state.running && video.readyState >= 2 && ts - lastRebuild > REBUILD_INTERVAL) {
+        if (state.running && video.readyState >= 2 && video.videoWidth > 0 && ts - lastRebuild > REBUILD_INTERVAL) {
           pixelCanvas.width = SAMPLE_W;
           pixelCanvas.height = SAMPLE_H;
           const imageData = sampleFrame();
@@ -953,27 +951,38 @@
       permBtn.addEventListener('click', startCamera);
 
       async function startCamera() {
+        // Start camera request immediately to preserve the user gesture context on iOS!
+        const cameraPromise = navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+          },
+          audio: false
+        });
+
         // iOS requires audio context started within user gesture
         if (typeof Tone !== 'undefined') {
-          await Tone.start();
-          if (Tone.context && Tone.context.state !== 'running') {
-            await Tone.context.resume();
+          try {
+            await Tone.start();
+            if (Tone.context && Tone.context.state !== 'running') {
+              await Tone.context.resume();
+            }
+          } catch (e) {
+            console.error("Tone.start error:", e);
           }
         }
         // Initialize audio within user gesture context (critical for iOS)
-        await initAudio();
+        try {
+          await initAudio();
+        } catch (e) {
+          console.error("initAudio error:", e);
+        }
 
         permBtn.textContent = 'Initialising…';
         permBtn.disabled = true;
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              width: { ideal: 640 },
-              height: { ideal: 480 },
-              facingMode: 'user'
-            },
-            audio: false
-          });
+          const stream = await cameraPromise;
           video.srcObject = stream;
           video.onloadedmetadata = () => {
             video.play();
