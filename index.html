@@ -745,7 +745,7 @@
         const handOpen = state.handOpenness;
 
         // Build array of repulsion points (single sphere for palm or mouse fallback)
-        const repulseR = 40 + handOpen * 200;  // dynamic radius based on openness
+        const repulseR = 40 + handOpen * (isMobile ? 180 : 280);  // dynamic radius based on openness
         const repPoints = [];
 
         if (state.handActive && state.palmX !== undefined) {
@@ -1074,12 +1074,18 @@
                   avgDist += Math.sqrt(dx * dx + dy * dy);
                 }
                 avgDist /= tips.length;
-                // normalize: closed ~0.06, open ~0.22
-                const openness = Math.max(0, Math.min(1, (avgDist - 0.06) / 0.16));
+                
+                // Scale-invariant openness: normalize by palm length (wrist to middle MCP)
+                const palmLength = Math.sqrt(Math.pow(palmCenter.x - palm.x, 2) + Math.pow(palmCenter.y - palm.y, 2)) || 0.001;
+                const normalizedDist = avgDist / palmLength;
+                
+                // normalizedDist: closed ~1.0, open ~2.2
+                const openness = Math.max(0, Math.min(1, (normalizedDist - 1.0) / 1.2));
+                
                 // smooth repulse value
                 repulse += (openness - repulse) * 0.12;
-                // store openness for particle size inflation
-                state.handOpenness += (openness - state.handOpenness) * 0.03;
+                // store openness for particle size inflation - realtime response
+                state.handOpenness += (openness - state.handOpenness) * 0.35;
 
                 // Hand velocity for audio modulation
                 if (state.prevHandX > -1) {
