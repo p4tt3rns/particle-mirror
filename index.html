@@ -532,6 +532,7 @@
         mouseY: -1,
         prevMouseX: -1,
         prevMouseY: -1,
+        fingertips: [],  // array of {x, y} in normalized coords (0-1)
         frame: 0,
         particles: [],
         targetParticleCount: 0,
@@ -725,33 +726,30 @@
         }
         ctx.fillRect(0, 0, W(), H());
 
-        // Get interaction point and velocity
-        let ix = -999, iy = -999;
-        let velX = 0, velY = 0;
-        if (state.handActive) {
-          ix = state.handX * W();
-          iy = state.handY * H();
-          velX = state.handVelX * W();
-          velY = state.handVelY * H();
-        } else if (state.mouseX >= 0) {
-          ix = state.mouseX;
-          iy = state.mouseY;
-          if (state.prevMouseX >= 0) {
-            velX = ix - state.prevMouseX;
-            velY = iy - state.prevMouseY;
-          }
-          state.prevMouseX = ix;
-          state.prevMouseY = iy;
-        } else {
-          state.prevMouseX = -1;
-          state.prevMouseY = -1;
-        }
-
+        // Build array of repulsion points (fingertips or mouse fallback)
         const repulseR = 40 + repulse * 130;
         const repulseStr = 0.3 + repulse * 2.4;
+        const repPoints = [];
+
+        if (state.handActive && state.fingertips.length > 0) {
+          for (const ft of state.fingertips) {
+            repPoints.push({ x: ft.x * W(), y: ft.y * H() });
+          }
+        } else if (state.mouseX >= 0) {
+          repPoints.push({ x: state.mouseX, y: state.mouseY });
+        }
 
         // Hand openness drives particle size inflation in range
         const handOpen = state.handOpenness;
+
+        // Use center of fingertips for logo/circle position
+        let ix = -999, iy = -999;
+        if (repPoints.length > 0) {
+          ix = 0; iy = 0;
+          for (const rp of repPoints) { ix += rp.x; iy += rp.y; }
+          ix /= repPoints.length;
+          iy /= repPoints.length;
+        }
 
         // Update + draw particles
         ctx.save();
@@ -763,45 +761,31 @@
           const nx = noise(p.ox * 0.008, p.oy * 0.008, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.08);
           const ny = noise(p.ox * 0.008 + 100, p.oy * 0.008 + 100, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.08);
 
-          // Repulsion and velocity drag from hand/mouse — fluid sweeping effect
+          // Repulsion from each fingertip / mouse point
           let fx = 0, fy = 0;
-          if (ix > -900) {
-            const dx = p.x - ix;
-            const dy = p.y - iy;
+          for (let rpi = 0; rpi < repPoints.length; rpi++) {
+            const rp = repPoints[rpi];
+            const dx = p.x - rp.x;
+            const dy = p.y - rp.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < repulseR && dist > 0.5) {
               const proximity = 1 - dist / repulseR;
-              
-              // 1. Radial repulsion (pushes particles away)
               const repForce = Math.pow(proximity, 1.6) * repulseStr * 6;
               fx += (dx / dist) * repForce;
               fy += (dy / dist) * repForce;
-              
-              // 2. Velocity drag (sweeps particles along with hand/mouse swipe)
-              const dragForce = Math.pow(proximity, 1.2) * 0.45;
-              fx += velX * dragForce;
-              fy += velY * dragForce;
-              
               p.touch = 1;
               if (typeof triggerGrain === 'function') triggerGrain(p);
             }
           }
 
-          // Dynamic friction (damping):
-          // Let particles glide back fast when far (friction = 0.94),
-          // but damp them more when close (friction = 0.82) to lock in cleanly without jitter.
-          const dx = p.ox - p.x;
-          const dy = p.oy - p.y;
-          const distFromOrigin = Math.sqrt(dx * dx + dy * dy);
-          const friction = distFromOrigin < 8 ? 0.82 : 0.94;
+          // Damping
+          p.vx = (p.vx + fx + nx * 0.06) * 0.92;
+          p.vy = (p.vy + fy + ny * 0.06) * 0.92;
 
-          p.vx = (p.vx + fx + nx * 0.06) * friction;
-          p.vy = (p.vy + fy + ny * 0.06) * friction;
-
-          // Snappy elastic spring-back to origin
-          const springK = mode === 'burst' ? 0.015 : 0.035;
-          p.vx += dx * springK;
-          p.vy += dy * springK;
+          // Slow, gentle spring-back to origin
+          const springK = mode === 'burst' ? 0.003 : 0.008;
+          p.vx += (p.ox - p.x) * springK;
+          p.vy += (p.oy - p.y) * springK;
 
           p.x += p.vx;
           p.y += p.vy;
@@ -1050,7 +1034,7 @@
               const landmarks = results.multiHandLandmarks;
               if (landmarks && landmarks.length > 0) {
                 const hand = landmarks[0];
-                // Use index finger MCP (landmark 9) as interaction point
+                // Use index finger MCP (landmark 9) as main interaction center
                 const p = hand[9];
                 const targetX = 1 - p.x; // mirror horizontally
                 const targetY = p.y;
@@ -1058,6 +1042,13 @@
                 state.handX += (targetX - state.handX) * 0.35;
                 state.handY += (targetY - state.handY) * 0.35;
                 state.handActive = true;
+
+                // Track all 5 fingertip positions for multi-point repulsion
+                const tipIndices = [4, 8, 12, 16, 20];
+                state.fingertips = tipIndices.map(ti => ({
+                  x: 1 - hand[ti].x,  // mirror horizontally
+                  y: hand[ti].y
+                }));
 
                 // Hand openness: avg distance from palm center (landmark 0) to fingertips (4,8,12,16,20)
                 const palm = hand[0];
@@ -1090,6 +1081,7 @@
               } else {
                 state.handActive = false;
                 state.handOpenness *= 0.92;
+                state.fingertips = [];
                 fadeAudio();
               }
             });
