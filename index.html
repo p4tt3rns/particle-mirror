@@ -554,16 +554,13 @@
       const TARGET_SAMPLE_AREA = 50000;
 
       function computeSampleDimensions() {
-        if (isMobile) {
-          SAMPLE_W = 160;
-          SAMPLE_H = 120;
-        } else {
-          const ar = (window.innerWidth || 390) / (window.innerHeight || 844);
-          const sh = Math.round(Math.sqrt(TARGET_SAMPLE_AREA / ar));
-          const sw = Math.round(sh * ar);
-          SAMPLE_W = Math.max(60, sw);
-          SAMPLE_H = Math.max(60, sh);
-        }
+        const ar = (window.innerWidth || 390) / (window.innerHeight || 844);
+        // Use a smaller sample area for mobile for performance, but keep correct aspect ratio
+        const targetArea = isMobile ? 25000 : TARGET_SAMPLE_AREA;
+        const sh = Math.round(Math.sqrt(targetArea / ar));
+        const sw = Math.round(sh * ar);
+        SAMPLE_W = Math.max(50, sw);
+        SAMPLE_H = Math.max(50, sh);
       }
       computeSampleDimensions();
 
@@ -607,30 +604,24 @@
         return noiseTable[(ix + iy * 57 + it * 131) & 511];
       }
 
-      // ---- Webcam sampling ----
       function sampleFrame() {
         pixCtx.save();
         pixCtx.scale(-1, 1); // mirror
         
-        if (isMobile) {
-          // Mobile: simple robust stretching to cover the whole screen and prevent rotation/cropping bugs
-          pixCtx.drawImage(video, -SAMPLE_W, 0, SAMPLE_W, SAMPLE_H);
+        // Premium high-resolution cover cropping for all devices
+        const videoW = video.videoWidth || 640;
+        const videoH = video.videoHeight || 480;
+        const screenAR = W() / H();
+        const videoAR = videoW / videoH;
+        let sx = 0, sy = 0, sw = videoW, sh = videoH;
+        if (videoAR > screenAR) {
+          sw = videoH * screenAR;
+          sx = (videoW - sw) / 2;
         } else {
-          // Desktop: premium high-resolution cover cropping
-          const videoW = video.videoWidth || 640;
-          const videoH = video.videoHeight || 480;
-          const screenAR = W() / H();
-          const videoAR = videoW / videoH;
-          let sx = 0, sy = 0, sw = videoW, sh = videoH;
-          if (videoAR > screenAR) {
-            sw = videoH * screenAR;
-            sx = (videoW - sw) / 2;
-          } else {
-            sh = videoW / screenAR;
-            sy = (videoH - sh) / 2;
-          }
-          pixCtx.drawImage(video, sx, sy, sw, sh, -SAMPLE_W, 0, SAMPLE_W, SAMPLE_H);
+          sh = videoW / screenAR;
+          sy = (videoH - sh) / 2;
         }
+        pixCtx.drawImage(video, sx, sy, sw, sh, -SAMPLE_W, 0, SAMPLE_W, SAMPLE_H);
         
         pixCtx.restore();
         return pixCtx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
