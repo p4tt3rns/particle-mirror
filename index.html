@@ -530,6 +530,8 @@
         handVelY: 0,
         mouseX: -1,
         mouseY: -1,
+        prevMouseX: -1,
+        prevMouseY: -1,
         frame: 0,
         particles: [],
         targetParticleCount: 0,
@@ -723,9 +725,28 @@
         }
         ctx.fillRect(0, 0, W(), H());
 
-        // Get interaction point
-        const ix = state.handActive ? state.handX * W() : -999;
-        const iy = state.handActive ? state.handY * H() : -999;
+        // Get interaction point and velocity
+        let ix = -999, iy = -999;
+        let velX = 0, velY = 0;
+        if (state.handActive) {
+          ix = state.handX * W();
+          iy = state.handY * H();
+          velX = state.handVelX * W();
+          velY = state.handVelY * H();
+        } else if (state.mouseX >= 0) {
+          ix = state.mouseX;
+          iy = state.mouseY;
+          if (state.prevMouseX >= 0) {
+            velX = ix - state.prevMouseX;
+            velY = iy - state.prevMouseY;
+          }
+          state.prevMouseX = ix;
+          state.prevMouseY = iy;
+        } else {
+          state.prevMouseX = -1;
+          state.prevMouseY = -1;
+        }
+
         const repulseR = 40 + repulse * 130;
         const repulseStr = 0.3 + repulse * 2.4;
 
@@ -742,28 +763,45 @@
           const nx = noise(p.ox * 0.008, p.oy * 0.008, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.08);
           const ny = noise(p.ox * 0.008 + 100, p.oy * 0.008 + 100, t * 0.05 + p.noiseOff) * (scatter * 0.6 + 0.08);
 
-          // Repulsion from hand/mouse — liquid push
+          // Repulsion and velocity drag from hand/mouse — fluid sweeping effect
           let fx = 0, fy = 0;
           if (ix > -900) {
             const dx = p.x - ix;
             const dy = p.y - iy;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < repulseR && dist > 0.5) {
-              const force = Math.pow(1 - dist / repulseR, 1.6) * repulseStr;
-              fx = (dx / dist) * force * 5;
-              fy = (dy / dist) * force * 5;
+              const proximity = 1 - dist / repulseR;
+              
+              // 1. Radial repulsion (pushes particles away)
+              const repForce = Math.pow(proximity, 1.6) * repulseStr * 6;
+              fx += (dx / dist) * repForce;
+              fy += (dy / dist) * repForce;
+              
+              // 2. Velocity drag (sweeps particles along with hand/mouse swipe)
+              const dragForce = Math.pow(proximity, 1.2) * 0.45;
+              fx += velX * dragForce;
+              fy += velY * dragForce;
+              
               p.touch = 1;
               if (typeof triggerGrain === 'function') triggerGrain(p);
             }
           }
 
-          p.vx = (p.vx + fx + nx * 0.08) * 0.92;
-          p.vy = (p.vy + fy + ny * 0.08) * 0.92;
+          // Dynamic friction (damping):
+          // Let particles glide back fast when far (friction = 0.94),
+          // but damp them more when close (friction = 0.82) to lock in cleanly without jitter.
+          const dx = p.ox - p.x;
+          const dy = p.oy - p.y;
+          const distFromOrigin = Math.sqrt(dx * dx + dy * dy);
+          const friction = distFromOrigin < 8 ? 0.82 : 0.94;
 
-          // Gentle return to origin — liquid flow
-          const returnStr = mode === 'burst' ? 0.003 : 0.005;
-          p.vx += (p.ox - p.x) * returnStr;
-          p.vy += (p.oy - p.y) * returnStr;
+          p.vx = (p.vx + fx + nx * 0.06) * friction;
+          p.vy = (p.vy + fy + ny * 0.06) * friction;
+
+          // Snappy elastic spring-back to origin
+          const springK = mode === 'burst' ? 0.015 : 0.035;
+          p.vx += dx * springK;
+          p.vy += dy * springK;
 
           p.x += p.vx;
           p.y += p.vy;
