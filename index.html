@@ -1194,11 +1194,10 @@
           masterReverb.decay = 4;
         } else if (newMode === 'ghost') {
           const delay = new Tone.FeedbackDelay("4n", 0.6).connect(pannerX);
-          const filter = new Tone.AutoFilter("4n", 200, 4).connect(delay).start();
-          const eerieNoise = new Tone.Noise("brown").connect(filter).start();
-          eerieNoise.volume.value = -18;
-          // Removed tremolo and eerieSub to silence the throbbing "woaowoaowoao" sub-bass texture
-          currentModeNodes.push(delay, filter, eerieNoise);
+          const tremolo = new Tone.Tremolo(4, 0.75).connect(delay).start();
+          const eerieSub = new Tone.Oscillator(55, "pwm").connect(tremolo).start();
+          eerieSub.volume.value = -15;
+          currentModeNodes.push(delay, tremolo, eerieSub);
           if (droneOsc) {
             droneOsc.type = "sine";
             droneOsc.detune.value = 50; // Subtle dissonance
