@@ -603,24 +603,33 @@
       function sampleFrame() {
         const videoW = video.videoWidth || 640;
         const videoH = video.videoHeight || 480;
-        const screenAR = W() / H();
-        const videoAR = videoW / videoH;
-
-        // Crop video to match screen aspect ratio (cover-style, no distortion)
-        let sx = 0, sy = 0, sw = videoW, sh = videoH;
-        if (videoAR > screenAR) {
-          // Video wider than screen: crop sides
-          sw = videoH * screenAR;
-          sx = (videoW - sw) / 2;
-        } else {
-          // Video taller than screen: crop top/bottom
-          sh = videoW / screenAR;
-          sy = (videoH - sh) / 2;
-        }
 
         pixCtx.save();
-        pixCtx.scale(-1, 1); // mirror
-        pixCtx.drawImage(video, sx, sy, sw, sh, -SAMPLE_W, 0, SAMPLE_W, SAMPLE_H);
+        pixCtx.clearRect(0, 0, SAMPLE_W, SAMPLE_H);
+
+        if (isMobile && W() < H() && videoW > videoH) {
+          // Portrait phone holding, but landscape video sensor: rotate 90 degrees counter-clockwise!
+          const scale = Math.max(SAMPLE_W / videoH, SAMPLE_H / videoW);
+          pixCtx.translate(SAMPLE_W / 2, SAMPLE_H / 2);
+          pixCtx.scale(-1, 1); // mirror horizontally
+          pixCtx.rotate(-Math.PI / 2); // rotate 90 deg counter-clockwise
+          pixCtx.scale(scale, scale);
+          pixCtx.drawImage(video, -videoW / 2, -videoH / 2, videoW, videoH);
+        } else {
+          // Standard landscape or desktop drawing
+          const screenAR = W() / H();
+          const videoAR = videoW / videoH;
+          let sx = 0, sy = 0, sw = videoW, sh = videoH;
+          if (videoAR > screenAR) {
+            sw = videoH * screenAR;
+            sx = (videoW - sw) / 2;
+          } else {
+            sh = videoW / screenAR;
+            sy = (videoH - sh) / 2;
+          }
+          pixCtx.scale(-1, 1); // mirror
+          pixCtx.drawImage(video, sx, sy, sw, sh, -SAMPLE_W, 0, SAMPLE_W, SAMPLE_H);
+        }
         pixCtx.restore();
         return pixCtx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
       }
@@ -1009,8 +1018,19 @@
                 const hand = landmarks[0];
                 // Use index finger MCP (landmark 9) as interaction point
                 const p = hand[9];
-                const targetX = 1 - p.x; // mirror horizontally
-                const targetY = p.y;
+                
+                let targetX, targetY;
+                const videoW = video.videoWidth || 640;
+                const videoH = video.videoHeight || 480;
+                if (isMobile && W() < H() && videoW > videoH) {
+                  // Align coordinates with the -90deg rotation and mirroring
+                  targetX = 1 - p.y;
+                  targetY = p.x;
+                } else {
+                  targetX = 1 - p.x; // mirror horizontally
+                  targetY = p.y;
+                }
+                
                 // light de-jitter, realtime response
                 state.handX += (targetX - state.handX) * 0.35;
                 state.handY += (targetY - state.handY) * 0.35;
